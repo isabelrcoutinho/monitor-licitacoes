@@ -1,12 +1,15 @@
 """
-Monitor de Licitações Gov — Backend v6
-Proxy residencial para contornar bloqueio do PNCP a IPs de nuvem.
-Correção: janela de datas reduzida para 60 dias (PNCP rejeita janelas maiores).
+Monitor de Licitações Gov — Backend v7
+Correções:
+- PNCP /proposta: adicionado dataInicial (obrigatório)
+- PNCP /publicacao: janela de 30 dias (máximo aceito)
+- compras.dados.gov.br: HTTP forçado via allow_redirects=False
 """
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
+from requests.adapters import HTTPAdapter
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
@@ -14,31 +17,12 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-TIMEOUT = 12
-HEADERS = {"Accept": "application/json", "User-Agent": "MonitorLicitacoesBr/6.0"}
-
+TIMEOUT   = 12
+HEADERS   = {"Accept": "application/json", "User-Agent": "MonitorLicitacoesBr/7.0"}
 PROXY_URL = os.environ.get("PROXY_URL", "")
 
-def get_proxies():
-    if not PROXY_URL:
-        return None
-    return {"http": PROXY_URL, "https": PROXY_URL}
-
-
-# ─── helpers ──────────────────────────────────────────────────────────────────
-
-def get_pncp(url, params):
-    """GET ao PNCP via proxy."""
-    r = requests.get(url, params=params, headers=HEADERS,
-                     proxies=get_proxies(), timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()
-
-def get_direto(url, params):
-    """GET sem proxy (compras.dados.gov.br não precisa)."""
-    r = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+def proxies():
+    return {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 
 def contem_kw(texto, kw):
     if not kw:
@@ -69,17 +53,21 @@ def mapear_pncp(item):
     }
 
 
-# ─── Fonte 1: PNCP — propostas abertas ───────────────────────────────────────
-# Janela máxima aceita pelo PNCP: ~60 dias
+# ─── Fonte 1: PNCP propostas abertas ─────────────────────────────────────────
 
 def fonte_pncp_proposta(kw, pagina, uf):
     hoje = datetime.now()
-    fim  = (hoje + timedelta(days=45)).strftime("%Y%m%d")   # ← era 120, corrigido
+    ini  = hoje.strftime("%Y%m%d")                          # dataInicial = hoje
+    fim  = (hoje + timedelta(days=30)).strftime("%Y%m%d")   # dataFinal = hoje + 30 dias
 
-    data  = get_pncp(
+    r = requests.get(
         "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
-        {"dataFinal": fim, "pagina": pagina, "tamanhoPagina": 20},
+        params={"dataInicial": ini, "dataFinal": fim,
+                "pagina": pagina, "tamanhoPagina": 20},
+        headers=HEADERS, proxies=proxies(), timeout=TIMEOUT,
     )
+    r.raise_for_status()
+    data  = r.json()
     items = data.get("data") or []
     total = data.get("totalRegistros") or len(items)
 
@@ -89,23 +77,28 @@ def fonte_pncp_proposta(kw, pagina, uf):
         if contem_kw(i.get("objetoCompra"), kw) and (not uf or uf_i == uf):
             res.append(mapear_pncp(i))
 
+    # fallback: se nenhum match de kw, devolve os 10 primeiros
     if not res and items and not kw:
         res = [mapear_pncp(i) for i in items[:10]]
 
     return res, total
 
 
-# ─── Fonte 2: PNCP — publicações recentes ────────────────────────────────────
+# ─── Fonte 2: PNCP publicações recentes ──────────────────────────────────────
 
 def fonte_pncp_publicacao(kw, pagina, uf):
     hoje = datetime.now()
-    ini  = (hoje - timedelta(days=30)).strftime("%Y%m%d")
-    fim  = (hoje + timedelta(days=30)).strftime("%Y%m%d")   # ← era 120, corrigido
+    ini  = (hoje - timedelta(days=20)).strftime("%Y%m%d")   # últimos 20 dias
+    fim  = hoje.strftime("%Y%m%d")                          # até hoje
 
-    data  = get_pncp(
+    r = requests.get(
         "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao",
-        {"dataInicial": ini, "dataFinal": fim, "pagina": pagina, "tamanhoPagina": 20},
+        params={"dataInicial": ini, "dataFinal": fim,
+                "pagina": pagina, "tamanhoPagina": 20},
+        headers=HEADERS, proxies=proxies(), timeout=TIMEOUT,
     )
+    r.raise_for_status()
+    data  = r.json()
     items = data.get("data") or []
     total = data.get("totalRegistros") or len(items)
 
@@ -118,18 +111,26 @@ def fonte_pncp_publicacao(kw, pagina, uf):
     return res, total
 
 
-# ─── Fonte 3: compras.dados.gov.br (HTTP obrigatório, sem proxy) ─────────────
+# ─── Fonte 3: compras.dados.gov.br (HTTP puro, sem redirect) ─────────────────
 
 def fonte_compras_dados(kw, pagina):
     res   = []
     total = 0
 
+    session = requests.Session()
+    # força HTTP — não segue redirect para HTTPS
+    session.max_redirects = 0
+
     for modalidade in ["05", "01", "08"]:
         try:
-            data     = get_direto(
+            r = session.get(
                 "http://compras.dados.gov.br/licitacoes/v1/licitacoes.json",
-                {"modalidade": modalidade, "pagina": pagina},
+                params={"modalidade": modalidade, "pagina": pagina},
+                headers=HEADERS, timeout=TIMEOUT, allow_redirects=False,
             )
+            if r.status_code not in (200, 201):
+                continue
+            data     = r.json()
             embedded = data.get("_embedded") or {}
             items    = list(embedded.values())[0] if embedded else []
             total   += (data.get("page") or {}).get("totalElements") or len(items)
@@ -165,10 +166,7 @@ def buscar_licitacoes():
     pagina = max(1, int(request.args.get("pagina", 1)))
     uf     = request.args.get("uf", "").strip().upper()
 
-    resultados = []
-    erros      = []
-    total      = 0
-    ids_vistos = set()
+    resultados, erros, total, ids_vistos = [], [], 0, set()
 
     tarefas = {
         "pncp_proposta":   lambda: fonte_pncp_proposta(kw, pagina, uf),
@@ -208,95 +206,82 @@ def buscar_licitacoes():
 
 @app.route("/health")
 def health():
-    return jsonify({
-        "status":      "ok",
-        "versao":      "6.0",
-        "proxy_ativo": bool(PROXY_URL),
-        "timestamp":   datetime.now().isoformat(),
-    })
+    return jsonify({"status": "ok", "versao": "7.0",
+                    "proxy_ativo": bool(PROXY_URL),
+                    "timestamp": datetime.now().isoformat()})
 
 
 # ─── Diagnóstico ──────────────────────────────────────────────────────────────
 
 @app.route("/api/teste")
 def testar_apis():
-    hoje    = datetime.now()
-    proxies = get_proxies()
-    result  = {}
+    hoje = datetime.now()
+    px   = proxies()
+    res  = {}
 
-    # PNCP proposta
+    # PNCP proposta (com dataInicial e dataFinal)
     try:
-        fim = (hoje + timedelta(days=45)).strftime("%Y%m%d")
-        t0  = datetime.now()
-        r   = requests.get(
-            "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
-            params={"dataFinal": fim, "pagina": 1, "tamanhoPagina": 1},
-            headers=HEADERS, proxies=proxies, timeout=TIMEOUT,
-        )
-        result["pncp_proposta"] = {
-            "ok": r.ok, "status": r.status_code,
-            "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-            "proxy": "sim" if proxies else "não",
-        }
-    except Exception as e:
-        result["pncp_proposta"] = {
-            "ok": False, "erro": str(e)[:150],
-            "tempo": "—", "proxy": "sim" if proxies else "não",
-        }
-
-    # PNCP publicacao
-    try:
-        ini = (hoje - timedelta(days=7)).strftime("%Y%m%d")
+        ini = hoje.strftime("%Y%m%d")
         fim = (hoje + timedelta(days=30)).strftime("%Y%m%d")
         t0  = datetime.now()
         r   = requests.get(
-            "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao",
-            params={"dataInicial": ini, "dataFinal": fim, "pagina": 1, "tamanhoPagina": 1},
-            headers=HEADERS, proxies=proxies, timeout=TIMEOUT,
+            "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
+            params={"dataInicial": ini, "dataFinal": fim,
+                    "pagina": 1, "tamanhoPagina": 1},
+            headers=HEADERS, proxies=px, timeout=TIMEOUT,
         )
-        result["pncp_publicacao"] = {
-            "ok": r.ok, "status": r.status_code,
-            "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-            "proxy": "sim" if proxies else "não",
-        }
+        res["pncp_proposta"] = {"ok": r.ok, "status": r.status_code,
+                                "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
+                                "proxy": "sim" if px else "não"}
     except Exception as e:
-        result["pncp_publicacao"] = {
-            "ok": False, "erro": str(e)[:150],
-            "tempo": "—", "proxy": "sim" if proxies else "não",
-        }
+        res["pncp_proposta"] = {"ok": False, "erro": str(e)[:150],
+                                "proxy": "sim" if px else "não"}
 
-    # compras.dados.gov.br (HTTP, sem proxy)
+    # PNCP publicacao (últimos 7 dias)
+    try:
+        ini = (hoje - timedelta(days=7)).strftime("%Y%m%d")
+        fim = hoje.strftime("%Y%m%d")
+        t0  = datetime.now()
+        r   = requests.get(
+            "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao",
+            params={"dataInicial": ini, "dataFinal": fim,
+                    "pagina": 1, "tamanhoPagina": 1},
+            headers=HEADERS, proxies=px, timeout=TIMEOUT,
+        )
+        res["pncp_publicacao"] = {"ok": r.ok, "status": r.status_code,
+                                  "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
+                                  "proxy": "sim" if px else "não"}
+    except Exception as e:
+        res["pncp_publicacao"] = {"ok": False, "erro": str(e)[:150],
+                                  "proxy": "sim" if px else "não"}
+
+    # compras.dados.gov.br HTTP
     try:
         t0 = datetime.now()
         r  = requests.get(
             "http://compras.dados.gov.br/licitacoes/v1/licitacoes.json",
             params={"modalidade": "05", "pagina": 1},
-            headers=HEADERS, timeout=TIMEOUT,
+            headers=HEADERS, timeout=TIMEOUT, allow_redirects=False,
         )
-        result["compras_dados"] = {
-            "ok": r.ok, "status": r.status_code,
-            "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-            "proxy": "não (HTTP direto)",
-        }
+        res["compras_dados"] = {"ok": r.status_code == 200,
+                                "status": r.status_code,
+                                "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
+                                "proxy": "não (HTTP direto)"}
     except Exception as e:
-        result["compras_dados"] = {
-            "ok": False, "erro": str(e)[:150],
-            "tempo": "—",
-        }
+        res["compras_dados"] = {"ok": False, "erro": str(e)[:150]}
 
-    result["_config"] = {
+    res["_config"] = {
         "proxy_configurado": bool(PROXY_URL),
         "proxy_preview":     (PROXY_URL[:25] + "...") if PROXY_URL else "não configurado",
-        "versao":            "6.0",
+        "versao":            "7.0",
     }
-
-    return jsonify(result)
+    return jsonify(res)
 
 
 # ─── Iniciar ──────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n✅ Monitor de Licitações v6 — http://localhost:{port}")
+    print(f"\n✅ Monitor v7 — http://localhost:{port}")
     print(f"   Proxy: {'✅ ativo' if PROXY_URL else '❌ não configurado'}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
