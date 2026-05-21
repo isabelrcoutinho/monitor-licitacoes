@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor de Licitações Gov</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0f14; --bg2: #13161e; --bg3: #1a1e29; --bg4: #21263a;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+  --text: #e8eaf0; --text2: #8890a8; --text3: #555f7a;
+  --accent: #3d7fff; --accent2: #6fa3ff;
+  --accent-bg: rgba(61,127,255,0.1); --accent-border: rgba(61,127,255,0.3);
+  --green: #22c87a; --green-bg: rgba(34,200,122,0.1);
+  --amber: #f5a623; --amber-bg: rgba(245,166,35,0.1);
+  --red: #ff4d4d; --red-bg: rgba(255,77,77,0.1);
+  --font: 'Sora', sans-serif; --mono: 'DM Mono', monospace;
+  --radius: 10px; --radius-lg: 14px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.6; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: linear-gradient(rgba(61,127,255,0.015) 1px,transparent 1px), linear-gradient(90deg,rgba(61,127,255,0.015) 1px,transparent 1px);
+  background-size: 48px 48px;
+}
+.wrap { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+/* HEADER */
+header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.logo-area { display: flex; flex-direction: column; gap: 4px; }
+.logo-tag { font-family: var(--mono); font-size: 10px; color: var(--accent2); letter-spacing: .15em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+.logo-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+h1 span { color: var(--accent2); }
+.header-meta { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+.header-actions { display: flex; gap: 8px; flex-direction: column; align-items: flex-end; }
+.backend-url { font-family: var(--mono); font-size: 10px; color: var(--text3); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 10px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-icon { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; background: transparent; transition: all .2s; }
+.btn-icon:hover { background: var(--bg3); color: var(--text); }
+.btn-icon.blue { border-color: var(--accent-border); color: var(--accent2); background: var(--accent-bg); }
+.btn-icon.blue:hover { background: rgba(61,127,255,.2); }
+
+/* STATS */
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.75rem; }
+.stat { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; position: relative; overflow: hidden; }
+.stat::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); opacity: .4; }
+.stat.red::before { background: var(--red); } .stat.green::before { background: var(--green); } .stat.amber::before { background: var(--amber); }
+.stat-label { font-size: 10px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+.stat-val { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+.stat.red .stat-val { color: var(--red); } .stat.green .stat-val { color: var(--green); } .stat.amber .stat-val { color: var(--amber); }
+.stat-sub { font-size: 10px; color: var(--text3); margin-top: 3px; }
+
+/* SEARCH */
+.search-area { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 1rem; }
+.search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.si { flex: 1; height: 38px; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 13px; padding: 0 12px; outline: none; transition: border .2s; }
+.si:focus { border-color: var(--accent); }
+.si::placeholder { color: var(--text3); }
+.si.short { max-width: 90px; cursor: pointer; }
+.si.mid { max-width: 160px; cursor: pointer; }
+.btn-buscar { height: 38px; padding: 0 20px; background: var(--accent); border: none; border-radius: var(--radius); color: #fff; font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity .2s; white-space: nowrap; }
+.btn-buscar:hover { opacity: .85; }
+.btn-buscar:disabled { opacity: .4; cursor: not-allowed; }
+.kw-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.kw-hint { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-right: 4px; }
+.kw-tag { font-size: 11px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; color: var(--text2); transition: all .15s; font-family: var(--mono); }
+.kw-tag:hover { border-color: var(--accent-border); color: var(--accent2); }
+.kw-tag.on { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent2); }
+
+/* ALERT */
+.alert { border-radius: var(--radius); padding: 10px 14px; font-size: 12px; margin-bottom: 1rem; display: none; }
+.alert.show { display: block; }
+.alert.warn { background: var(--amber-bg); border: 1px solid rgba(245,166,35,.25); color: var(--amber); }
+.alert.err  { background: var(--red-bg); border: 1px solid rgba(255,77,77,.25); color: var(--red); }
+.alert.ok   { background: var(--green-bg); border: 1px solid rgba(34,200,122,.25); color: var(--green); }
+
+/* TABS */
+.tab-row { display: flex; gap: 2px; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.tab { font-size: 12px; padding: 8px 16px; cursor: pointer; color: var(--text3); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: var(--mono); transition: color .15s; display: flex; align-items: center; gap: 6px; }
+.tab:hover { color: var(--text2); }
+.tab.on { color: var(--accent2); border-bottom-color: var(--accent); }
+
+/* RESULTS */
+.res-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.res-title { font-size: 12px; color: var(--text3); font-family: var(--mono); display: flex; align-items: center; gap: 8px; }
+.pill { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); }
+.pill-blue   { background: var(--accent-bg); color: var(--accent2); border: 1px solid var(--accent-border); }
+.pill-green  { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,200,122,.3); }
+.pill-amber  { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245,166,35,.3); }
+.pill-red    { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,77,.3); }
+.pill-gray   { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+
+/* CARDS */
+.list { display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; transition: border-color .2s; animation: fadeIn .25s ease both; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+.card:hover { border-color: var(--border2); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.dot-g { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot-a { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.dot-r { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+.card-title { font-size: 13px; font-weight: 500; line-height: 1.45; flex: 1; }
+.card-valor { font-size: 14px; font-weight: 600; color: var(--green); white-space: nowrap; font-family: var(--mono); }
+.card-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.meta { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 4px; font-family: var(--mono); }
+.card-footer { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-c { font-size: 11px; padding: 5px 12px; border-radius: var(--radius); cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text2); font-family: var(--font); transition: all .15s; display: flex; align-items: center; gap: 5px; }
+.btn-c:hover { background: var(--bg3); color: var(--text); }
+.btn-c.acc   { border-color: var(--accent-border); color: var(--accent2); }
+.btn-c.acc:hover   { background: var(--accent-bg); }
+.btn-c.heart { color: var(--red); border-color: rgba(255,77,77,.3); }
+.btn-c.heart:hover { background: var(--red-bg); }
+.btn-c.ia    { color: var(--green); border-color: rgba(34,200,122,.3); }
+.btn-c.ia:hover    { background: var(--green-bg); }
+
+/* EMPTY / LOADING */
+.empty { text-align: center; padding: 3rem 1rem; color: var(--text3); font-size: 13px; border: 1px dashed var(--border); border-radius: var(--radius-lg); }
+.loading { text-align: center; padding: 2rem; color: var(--text3); font-size: 13px; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.load-more { text-align: center; margin-top: 1rem; display: none; }
+.btn-mais { padding: 8px 24px; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-family: var(--font); font-size: 12px; cursor: pointer; transition: all .2s; }
+.btn-mais:hover { border-color: var(--accent-border); color: var(--accent2); }
+
+/* CONFIG MODAL */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; display: none; align-items: center; justify-content: center; padding: 1rem; }
+.overlay.show { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 440px; }
+.modal h2 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+.modal p  { font-size: 12px; color: var(--text3); margin-bottom: 16px; line-height: 1.5; }
+.modal label { font-size: 11px; color: var(--text2); font-family: var(--mono); display: block; margin-bottom: 4px; }
+.modal input { width: 100%; height: 38px; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--mono); font-size: 12px; padding: 0 12px; outline: none; margin-bottom: 16px; }
+.modal input:focus { border-color: var(--accent); }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* FOOTER */
+footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text3); font-family: var(--mono); flex-wrap: wrap; gap: 8px; }
+footer a { color: var(--accent2); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .stats { grid-template-columns: repeat(2,1fr); }
+  .search-row { flex-wrap: wrap; }
+  .si { min-width: calc(50% - 4px); }
+  header { flex-direction: column; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- CONFIG MODAL -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>⚙ Configurar backend</h2>
+    <p>Cole aqui a URL do seu servidor Python (Railway ou Render).<br>
+    Exemplo: <code style="color:var(--accent2)">https://monitor-licitacoes.up.railway.app</code></p>
+    <label>URL do servidor</label>
+    <input type="text" id="backend-input" placeholder="https://seu-app.up.railway.app" />
+    <div class="modal-footer">
+      <button class="btn-icon" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-icon blue" onclick="salvarBackend()">Salvar e reconectar</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="logo-area">
+      <div class="logo-tag" id="status-tag">Conectando ao backend...</div>
+      <h1>Licitações <span>Gov</span></h1>
+      <div class="header-meta">PNCP · Compras.gov.br · Dados Abertos</div>
+    </div>
+    <div class="header-actions">
+      <div class="backend-url" id="backend-label">sem servidor configurado</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-icon" onclick="abrirModal()">⚙ Configurar</button>
+        <button class="btn-icon blue" onclick="gerarRelatorio()">↓ Relatório</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">encontradas</div>
+      <div class="stat-val" id="st-total">—</div>
+      <div class="stat-sub">nesta busca</div>
+    </div>
+    <div class="stat red">
+      <div class="stat-label">urgentes</div>
+      <div class="stat-val" id="st-urg">—</div>
+      <div class="stat-sub">encerram em ≤3 dias</div>
+    </div>
+    <div class="stat green">
+      <div class="stat-label">valor estimado</div>
+      <div class="stat-val" id="st-valor">—</div>
+      <div class="stat-sub">total visível</div>
+    </div>
+    <div class="stat amber">
+      <div class="stat-label">atualizado</div>
+      <div class="stat-val" id="st-hora" style="font-size:15px">—</div>
+      <div class="stat-sub">horário de Brasília</div>
+    </div>
+  </div>
+
+  <div class="search-area">
+    <div class="search-row">
+      <input type="text" id="kw" class="si" placeholder="consultoria, treinamento, transformação digital..." value="consultoria">
+      <select id="uf" class="si short">
+        <option value="">UF</option>
+        <option>DF</option><option>SP</option><option>RJ</option><option>MG</option>
+        <option>RS</option><option>PR</option><option>SC</option><option>BA</option>
+        <option>GO</option><option>PE</option><option>CE</option><option>AM</option>
+      </select>
+      <select id="modalidade" class="si mid">
+        <option value="">Modalidade</option>
+        <option value="pregao">Pregão eletrônico</option>
+        <option value="concorrencia">Concorrência</option>
+        <option value="dispensa">Dispensa</option>
+      </select>
+      <button class="btn-buscar" id="btn" onclick="buscar()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Buscar
+      </button>
+    </div>
+    <div class="kw-row">
+      <span class="kw-hint">atalhos →</span>
+      <span class="kw-tag on"  onclick="kw(this,'consultoria')">consultoria</span>
+      <span class="kw-tag"     onclick="kw(this,'treinamento')">treinamento</span>
+      <span class="kw-tag"     onclick="kw(this,'transformação digital')">transf. digital</span>
+      <span class="kw-tag"     onclick="kw(this,'capacitação')">capacitação</span>
+      <span class="kw-tag"     onclick="kw(this,'gestão')">gestão</span>
+      <span class="kw-tag"     onclick="kw(this,'tecnologia')">tecnologia</span>
+      <span class="kw-tag"     onclick="kw(this,'software')">software</span>
+      <span class="kw-tag"     onclick="kw(this,'metodologia ágil')">método ágil</span>
+      <span class="kw-tag"     onclick="kw(this,'assessoria')">assessoria</span>
+    </div>
+  </div>
+
+  <div class="alert warn" id="alert-warn"></div>
+  <div class="alert err"  id="alert-err"></div>
+  <div class="alert ok"   id="alert-ok"></div>
+
+  <div class="tab-row">
+    <div class="tab on" id="tab-abertas"  onclick="setTab('abertas')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Em aberto
+    </div>
+    <div class="tab" id="tab-recentes" onclick="setTab('recentes')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Últimos 30 dias
+    </div>
+    <div class="tab" id="tab-salvas" onclick="setTab('salvas')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+      Salvas <span id="sc" class="pill pill-blue" style="display:none">0</span>
+    </div>
+  </div>
+
+  <div class="res-head">
+    <div class="res-title">
+      <span id="res-label">Resultados</span>
+      <span class="pill pill-blue" id="cp" style="display:none">0</span>
+    </div>
+    <div class="res-title" style="font-size:10px; gap:4px">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+      fonte: PNCP + Compras.gov.br
+    </div>
+  </div>
+
+  <div class="list" id="lista"></div>
+  <div class="load-more" id="load-more">
+    <button class="btn-mais" onclick="mais()">Carregar mais resultados</button>
+  </div>
+
+  <footer>
+    <div>Monitor de Licitações Gov · v1.0</div>
+    <div>
+      <a href="https://pncp.gov.br" target="_blank">PNCP</a> ·
+      <a href="https://compras.dados.gov.br" target="_blank">Compras.gov.br</a> ·
+      <a href="https://www.gov.br/compras" target="_blank">Portal de Compras</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+// ── Estado ──
+let resultados = [], salvas = [], pagina = 1, tabAtual = 'abertas', totalAPI = 0;
+
+// ── Backend URL (salvo no navegador) ──
+let BACKEND = localStorage.getItem('backend_url') || '';
+atualizarStatusTag();
+
+function atualizarStatusTag() {
+  const tag = document.getElementById('status-tag');
+  const lbl = document.getElementById('backend-label');
+  if (BACKEND) {
+    tag.textContent = '● API real conectada';
+    tag.style.color = 'var(--green)';
+    lbl.textContent = BACKEND.replace('https://','');
+  } else {
+    tag.textContent = '○ Sem backend — modo demo';
+    tag.style.color = 'var(--amber)';
+    lbl.textContent = 'clique em ⚙ Configurar';
+  }
+}
+
+// ── Modal de configuração ──
+function abrirModal() {
+  document.getElementById('backend-input').value = BACKEND;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function fecharModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+function salvarBackend() {
+  const v = document.getElementById('backend-input').value.trim().replace(/\/$/, '');
+  BACKEND = v;
+  localStorage.setItem('backend_url', v);
+  fecharModal();
+  atualizarStatusTag();
+  showAlert('ok', '✓ Backend salvo! Buscando dados reais...');
+  buscar();
+}
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) fecharModal(); });
+
+// ── Alertas ──
+function showAlert(tipo, msg) {
+  ['warn','err','ok'].forEach(t => { const el = document.getElementById('alert-' + t); el.textContent = ''; el.classList.remove('show'); });
+  const el = document.getElementById('alert-' + tipo);
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 6000);
+}
+
+// ── Keywords ──
+function kw(el, v) {
+  document.querySelectorAll('.kw-tag').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('kw').value = v;
+}
+
+// ── Tabs ──
+function setTab(t) {
+  tabAtual = t;
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  document.getElementById('tab-' + t).classList.add('on');
+  t === 'salvas' ? renderSalvas() : render(resultados);
+}
+
+// ── Formatadores ──
+function fmtV(v) {
+  if (!v || isNaN(v)) return null;
+  const n = parseFloat(v);
+  if (n >= 1e6) return 'R$ ' + (n/1e6).toFixed(1).replace('.',',') + 'M';
+  if (n >= 1e3) return 'R$ ' + Math.round(n/1e3) + 'k';
+  return 'R$ ' + Math.round(n).toLocaleString('pt-BR');
+}
+function fmtD(s) { if (!s) return null; try { return new Date(s).toLocaleDateString('pt-BR'); } catch(e) { return s; } }
+function diasR(s) { if (!s) return null; return Math.ceil((new Date(s) - new Date()) / 86400000); }
+
+// ── Busca real ou demo ──
+async function buscar(reset) {
+  if (reset !== false) { pagina = 1; resultados = []; }
+  const kwVal = document.getElementById('kw').value.trim() || 'consultoria';
+  const ufVal = document.getElementById('uf').value;
+  const btn   = document.getElementById('btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Buscando...';
+
+  if (pagina === 1)
+    document.getElementById('lista').innerHTML = '<div class="loading"><span class="spin"></span>&nbsp; Consultando APIs...</div>';
+
+  let novos = [], erros = [], total = 0;
+
+  if (BACKEND) {
+    // ── Chama nosso backend Python ──
+    try {
+      const qs = new URLSearchParams({ q: kwVal, pagina, ...(ufVal && { uf: ufVal }) });
+      const r  = await fetch(`${BACKEND}/api/licitacoes?${qs}`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      novos  = d.resultados || [];
+      total  = d.total || novos.length;
+      erros  = d.erros || [];
+      if (erros.length) showAlert('warn', '⚠ ' + erros.join(' | '));
+    } catch(e) {
+      showAlert('err', '✗ Erro ao conectar ao backend: ' + e.message + '. Verifique a URL em ⚙ Configurar.');
+      novos = demoData(kwVal);
+      total = novos.length;
+    }
+  } else {
+    // ── Sem backend: tenta direto (pode falhar por CORS) ──
+    try {
+      const hoje = new Date();
+      const ini  = new Date(hoje); ini.setDate(ini.getDate() - 30);
+      const fim  = new Date(hoje); fim.setDate(fim.getDate() + 90);
+      const f    = d => d.toISOString().split('T')[0].replace(/-/g,'');
+      const url  = `https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=${f(ini)}&dataFinal=${f(fim)}&pagina=${pagina}&tamanhoPagina=20`;
+      const r    = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d    = await r.json();
+      const items = d.data || [];
+      total = d.totalRegistros || items.length;
+      const kwL = kwVal.toLowerCase(), palavras = kwL.split(' ');
+      novos = items
+        .filter(i => palavras.some(p => (i.objetoCompra||'').toLowerCase().includes(p)))
+        .map(mapPNCP);
+      if (!novos.length && items.length) novos = items.slice(0,10).map(mapPNCP);
+    } catch(e) {
+      showAlert('warn', '⚠ APIs governamentais bloquearam o acesso direto (CORS). Exibindo dados de demonstração. Configure um backend para dados reais.');
+      novos = demoData(kwVal);
+      total = novos.length;
+    }
+  }
+
+  resultados = pagina === 1 ? novos : [...resultados, ...novos];
+  totalAPI   = total;
+  atualizarStats();
+  render(resultados);
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Buscar';
+  document.getElementById('st-hora').textContent = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('load-more').style.display = novos.length >= 10 ? 'block' : 'none';
+}
+
+function mais() { pagina++; buscar(false); }
+
+function mapPNCP(i) {
+  return {
+    id:         i.numeroControlePNCP || i.sequencialCompra,
+    titulo:     i.objetoCompra || 'Sem descrição',
+    orgao:      (i.orgaoEntidade||{}).razaoSocial || 'Órgão não informado',
+    uf:         ((i.unidadeOrgao||{}).ufSigla || '—').toUpperCase(),
+    modalidade: i.modalidadeNome || 'Não informada',
+    valor:      i.valorTotalEstimado,
+    dataEnc:    i.dataEncerramentoProposta,
+    dataPub:    i.dataPublicacaoPncp,
+    link:       i.linkSistemaOrigem || (i.numeroControlePNCP ? `https://pncp.gov.br/app/editais/${i.numeroControlePNCP}` : null),
+    fonte:      'PNCP'
+  };
+}
+
+// ── Stats ──
+function atualizarStats() {
+  const urg = resultados.filter(r => { const d = diasR(r.dataEnc); return d !== null && d >= 0 && d <= 3; }).length;
+  const vt  = resultados.reduce((s,r) => s + (parseFloat(r.valor)||0), 0);
+  document.getElementById('st-total').textContent = (totalAPI || resultados.length).toLocaleString('pt-BR');
+  document.getElementById('st-urg').textContent   = urg;
+  document.getElementById('st-valor').textContent = vt > 0 ? fmtV(vt) : '—';
+  const cp = document.getElementById('cp');
+  cp.textContent = resultados.length; cp.style.display = 'inline';
+}
+
+// ── Render ──
+function render(items) {
+  const el = document.getElementById('lista');
+  document.getElementById('res-label').textContent = tabAtual === 'salvas' ? 'Salvas' : tabAtual === 'recentes' ? 'Recentes' : 'Em aberto';
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="empty">◎<br><br>Nenhuma licitação encontrada.<br>Tente outros termos ou modalidades.</div>';
+    return;
+  }
+  el.innerHTML = items.map((item, i) => cardHTML(item, i)).join('');
+}
+function renderSalvas() {
+  const el = document.getElementById('lista');
+  document.getElementById('res-label').textContent = 'Salvas';
+  if (!salvas.length) {
+    el.innerHTML = '<div class="empty">♡<br><br>Nenhuma licitação salva.<br>Clique em Salvar em qualquer card.</div>';
+    return;
+  }
+  el.innerHTML = salvas.map((item, i) => cardHTML(item, i)).join('');
+}
+
+function cardHTML(item, idx) {
+  const dias    = diasR(item.dataEnc);
+  const urg     = dias === null ? 'n' : dias <= 3 ? 'r' : dias <= 7 ? 'a' : 'g';
+  const dotCls  = { g:'dot-g', a:'dot-a', r:'dot-r', n:'dot-g' }[urg];
+  const pCls    = { g:'pill-green', a:'pill-amber', r:'pill-red', n:'pill-gray' }[urg];
+  const urgLbl  = dias === null ? '' : dias <= 0 ? 'Encerrado' : dias === 1 ? 'Encerra amanhã' : `${dias} dias restantes`;
+  const vf      = fmtV(item.valor);
+  const isSalva = salvas.some(s => String(s.id) === String(item.id));
+  const sid     = String(item.id||idx).replace(/[^a-z0-9_-]/gi,'_');
+  const fc      = item.fonte === 'Demo' ? 'pill-gray' : 'pill-blue';
+  const delay   = Math.min(idx * 40, 400);
+
+  return `<div class="card" style="animation-delay:${delay}ms" id="card-${sid}">
+    <div class="card-top">
+      <div style="display:flex;gap:8px;flex:1">
+        <div class="card-dot ${dotCls}"></div>
+        <div class="card-title">${item.titulo}</div>
+      </div>
+      ${vf ? `<div class="card-valor">${vf}</div>` : ''}
+    </div>
+    <div class="card-meta">
+      <span class="meta">🏛 ${item.orgao}</span>
+      <span class="meta">📍 ${item.uf}</span>
+      <span class="meta">📄 ${item.modalidade}</span>
+      ${item.dataEnc ? `<span class="meta">📅 ${fmtD(item.dataEnc)}</span>` : ''}
+      ${urgLbl ? `<span class="pill ${pCls}">${urgLbl}</span>` : ''}
+      <span class="pill ${fc}">${item.fonte}</span>
+    </div>
+    <div class="card-footer">
+      ${item.link ? `<button class="btn-c acc" onclick="window.open('${item.link}','_blank')">↗ Ver edital</button>` : ''}
+      <button class="btn-c ${isSalva ? 'heart' : ''}" onclick="toggleSave('${item.id||idx}')">
+        ${isSalva ? '♥ Salva' : '♡ Salvar'}
+      </button>
+      <button class="btn-c ia" onclick="analisarIA('${item.id||idx}')">🤖 Analisar com IA</button>
+    </div>
+  </div>`;
+}
+
+// ── Salvar ──
+function toggleSave(id) {
+  const all  = [...resultados, ...salvas];
+  const item = all.find(r => String(r.id) === String(id) || String(r.fonte + r.titulo) === String(id));
+  if (!item) return;
+  const idx = salvas.findIndex(s => String(s.id) === String(id));
+  if (idx >= 0) salvas.splice(idx, 1); else salvas.push(item);
+  const sc = document.getElementById('sc');
+  sc.textContent = salvas.length; sc.style.display = salvas.length ? 'inline' : 'none';
+  tabAtual === 'salvas' ? renderSalvas() : render(resultados);
+}
+
+// ── Analisar com IA ──
+function analisarIA(id) {
+  const all  = [...resultados, ...salvas];
+  const item = all.find(r => String(r.id) === String(id)) || all[0];
+  if (!item) return;
+  const txt =
+`=== ANÁLISE DE OPORTUNIDADE — CONSULTECH ===
+
+📋 OBJETO: ${item.titulo}
+🏛  ÓRGÃO: ${item.orgao} (${item.uf})
+📄 MODALIDADE: ${item.modalidade}
+${item.valor ? '💰 VALOR ESTIMADO: ' + fmtV(item.valor) : ''}
+${item.dataEnc ? '📅 ENCERRAMENTO: ' + fmtD(item.dataEnc) : ''}
+${item.link ? '🔗 LINK: ' + item.link : ''}
+
+PERGUNTAS PARA ANÁLISE:
+1. É compatível com consultoria em transformação digital / gestão ágil / produtividade?
+2. Como me posicionar para ganhar esta licitação?
+3. Quais são os riscos e pontos de atenção?
+4. Quais os próximos passos concretos para participar?`;
+  navigator.clipboard.writeText(txt)
+    .then(() => showAlert('ok', '✓ Texto copiado! Cole no Claude ou ChatGPT para análise.'))
+    .catch(() => { prompt('Copie o texto:', txt); });
+}
+
+// ── Relatório ──
+function gerarRelatorio() {
+  if (!resultados.length) { showAlert('warn', '⚠ Faça uma busca antes de gerar o relatório.'); return; }
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  let txt = `RELATÓRIO DE LICITAÇÕES — ${hoje}\n`;
+  txt += `Busca: "${document.getElementById('kw').value}" | Total: ${resultados.length}\n\n`;
+  txt += '='.repeat(64) + '\n\n';
+  resultados.forEach((r, i) => {
+    const d = diasR(r.dataEnc);
+    txt += `${i+1}. ${r.titulo}\n`;
+    txt += `   Órgão: ${r.orgao} (${r.uf})\n`;
+    txt += `   Modalidade: ${r.modalidade}\n`;
+    if (r.valor) txt += `   Valor: ${fmtV(r.valor)}\n`;
+    if (r.dataEnc) txt += `   Encerra: ${fmtD(r.dataEnc)}${d !== null ? ' (' + (d <= 0 ? 'Encerrado' : d + ' dias') + ')' : ''}\n`;
+    if (r.link)  txt += `   Link: ${r.link}\n`;
+    txt += '\n';
+  });
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `licitacoes-${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+  showAlert('ok', '✓ Relatório gerado com sucesso!');
+}
+
+// ── Demo data ──
+function demoData(kwArg) {
+  const kw = kwArg || 'consultoria';
+  const orgs = [
+    {nome:'Ministério da Gestão e Inovação',uf:'DF'},{nome:'INSS',uf:'DF'},
+    {nome:'Prefeitura de São Paulo',uf:'SP'},{nome:'Governo de MG',uf:'MG'},
+    {nome:'ANS – Agência Nacional de Saúde',uf:'RJ'},{nome:'Banco do Brasil',uf:'DF'},
+    {nome:'TCU – Tribunal de Contas',uf:'DF'},{nome:'FNDE',uf:'DF'},
+    {nome:'Receita Federal',uf:'SP'},{nome:'DATAPREV',uf:'RJ'},
+  ];
+  const mods = [
+    {t:`Contratação de ${kw} em transformação digital e inovação`,v:480000,d:2,m:'Pregão Eletrônico'},
+    {t:`Serviços de ${kw} em gestão ágil e metodologias ativas`,v:320000,d:5,m:'Concorrência Eletrônica'},
+    {t:`${kw} e capacitação em gestão de processos – 80h`,v:195000,d:1,m:'Dispensa Eletrônica'},
+    {t:`Consultoria estratégica e mapeamento de fluxo de valor`,v:750000,d:12,m:'Pregão Eletrônico'},
+    {t:`Programa de ${kw} em produtividade – 40 servidores`,v:88000,d:3,m:'Pregão Eletrônico'},
+    {t:`Mentoria para implantação de PMO (escritório de projetos)`,v:240000,d:20,m:'Concorrência'},
+    {t:`Plataforma SaaS de gestão e produtividade`,v:156000,d:7,m:'Pregão Eletrônico'},
+    {t:`Adoção de metodologias ágeis em equipes de TI`,v:420000,d:0,m:'Concorrência'},
+    {t:`Workshop de transformação digital – 3 dias in loco`,v:65000,d:30,m:'Dispensa'},
+    {t:`Diagnóstico de maturidade digital e roadmap`,v:285000,d:4,m:'Pregão Eletrônico'},
+  ];
+  const hoje = new Date();
+  return mods.map((m, i) => {
+    const enc = new Date(hoje); enc.setDate(enc.getDate() + m.d);
+    return { id:'demo-'+i, titulo:m.t, orgao:orgs[i%orgs.length].nome, uf:orgs[i%orgs.length].uf,
+      modalidade:m.m, valor:m.v, dataEnc:enc.toISOString(), dataPub:new Date(hoje.getTime()-(i+1)*2*86400000).toISOString(),
+      link:'https://www.gov.br/compras/pt-br', fonte:'Demo' };
+  });
+}
+
+// ── Init ──
+buscar();
+</script>
+</body>
+</html>
