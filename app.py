@@ -1,5 +1,5 @@
 """
-Monitor de Licitações Gov — Backend v9
+Monitor de Licitações Gov — Backend v10
 Correção principal: PNCP não suporta busca por texto.
 Retorna os resultados sem filtrar — o frontend filtra localmente.
 Erro 400 no /publicacao corrigido: tamanhoPagina sem valor inteiro.
@@ -11,6 +11,7 @@ import requests
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -48,29 +49,48 @@ def mapear_pncp(item):
 # ─── Fonte 1: PNCP propostas abertas ─────────────────────────────────────────
 # Retorna tudo — sem filtro de palavra-chave (PNCP não suporta busca textual)
 
+def pncp_get(endpoint, params, tentativas=3):
+    """GET ao PNCP com retry automático e validação de JSON."""
+    ultimo_erro = None
+    for t in range(tentativas):
+        try:
+            r = requests.get(
+                f"https://pncp.gov.br/api/consulta/v1/{endpoint}",
+                params=params,
+                headers=HEADERS,
+                proxies=proxies(),
+                timeout=TIMEOUT,
+            )
+            # Valida que a resposta é JSON antes de tentar parsear
+            ct = r.headers.get("Content-Type", "")
+            if "json" not in ct and not r.text.strip().startswith("{"):
+                raise ValueError(f"Resposta não é JSON (status {r.status_code}): {r.text[:100]}")
+            r.raise_for_status()
+            return r.json()
+        except (ValueError, requests.exceptions.JSONDecodeError) as e:
+            ultimo_erro = e
+            time.sleep(2 ** t)   # espera 1s, 2s, 4s entre tentativas
+            continue
+        except requests.exceptions.RequestException as e:
+            ultimo_erro = e
+            if t < tentativas - 1:
+                time.sleep(2 ** t)
+            continue
+    raise ultimo_erro
+
+
 def fonte_pncp_proposta(pagina, uf):
     hoje = datetime.now()
-    ini  = hoje.strftime("%Y%m%d")
-    fim  = (hoje + timedelta(days=30)).strftime("%Y%m%d")
-
     params = {
-        "dataInicial":  ini,
-        "dataFinal":    fim,
-        "pagina":       int(pagina),
+        "dataInicial":   hoje.strftime("%Y%m%d"),
+        "dataFinal":     (hoje + timedelta(days=30)).strftime("%Y%m%d"),
+        "pagina":        int(pagina),
         "tamanhoPagina": 20,
     }
     if uf:
         params["ufSigla"] = uf
 
-    r = requests.get(
-        "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
-        params=params,
-        headers=HEADERS,
-        proxies=proxies(),
-        timeout=TIMEOUT,
-    )
-    r.raise_for_status()
-    data  = r.json()
+    data  = pncp_get("contratacoes/proposta", params)
     items = data.get("data") or []
     total = data.get("totalRegistros") or len(items)
     return [mapear_pncp(i) for i in items], total
@@ -80,27 +100,16 @@ def fonte_pncp_proposta(pagina, uf):
 
 def fonte_pncp_publicacao(pagina, uf):
     hoje = datetime.now()
-    ini  = (hoje - timedelta(days=15)).strftime("%Y%m%d")
-    fim  = hoje.strftime("%Y%m%d")
-
     params = {
-        "dataInicial":   ini,
-        "dataFinal":     fim,
+        "dataInicial":   (hoje - timedelta(days=15)).strftime("%Y%m%d"),
+        "dataFinal":     hoje.strftime("%Y%m%d"),
         "pagina":        int(pagina),
         "tamanhoPagina": 20,
     }
     if uf:
         params["ufSigla"] = uf
 
-    r = requests.get(
-        "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao",
-        params=params,
-        headers=HEADERS,
-        proxies=proxies(),
-        timeout=TIMEOUT,
-    )
-    r.raise_for_status()
-    data  = r.json()
+    data  = pncp_get("contratacoes/publicacao", params)
     items = data.get("data") or []
     total = data.get("totalRegistros") or len(items)
     return [mapear_pncp(i) for i in items], total
@@ -255,7 +264,7 @@ def testar_apis():
     res["_config"] = {
         "proxy_configurado": bool(PROXY_URL),
         "proxy_preview":     (PROXY_URL[:25] + "...") if PROXY_URL else "não configurado",
-        "versao":            "9.0",
+        "versao":            "10.0",
     }
     return jsonify(res)
 
@@ -264,6 +273,6 @@ def testar_apis():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n✅ Monitor v9 — http://localhost:{port}")
+    print(f"\n✅ Monitor v10 — http://localhost:{port}")
     print(f"   Proxy: {'✅ ativo' if PROXY_URL else '❌ não configurado'}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
