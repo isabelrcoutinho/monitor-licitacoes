@@ -1,5 +1,5 @@
 """
-Monitor de Licitações Gov — Backend v10
+Monitor de Licitações Gov — Backend v11
 Correção principal: PNCP não suporta busca por texto.
 Retorna os resultados sem filtrar — o frontend filtra localmente.
 Erro 400 no /publicacao corrigido: tamanhoPagina sem valor inteiro.
@@ -16,12 +16,28 @@ import time
 app = Flask(__name__)
 CORS(app)
 
-TIMEOUT   = 12
-HEADERS   = {"Accept": "application/json", "User-Agent": "MonitorLicitacoesBr/9.0"}
+TIMEOUT   = 15
 PROXY_URL = os.environ.get("PROXY_URL", "")
 
+# Headers que simulam um navegador real — reduz bloqueios do PNCP
+HEADERS = {
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "pt-BR,pt;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection":      "keep-alive",
+    "Origin":          "https://pncp.gov.br",
+    "Referer":         "https://pncp.gov.br/",
+    "Sec-Fetch-Dest":  "empty",
+    "Sec-Fetch-Mode":  "cors",
+    "Sec-Fetch-Site":  "same-origin",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+}
+
 def proxies():
-    return {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
+    """Usa proxy se configurado. Se proxy falhar, tenta sem proxy como fallback."""
+    if not PROXY_URL:
+        return None
+    return {"http": PROXY_URL, "https": PROXY_URL}
 
 def fmt_data(s):
     return str(s)[:10] if s else None
@@ -49,34 +65,56 @@ def mapear_pncp(item):
 # ─── Fonte 1: PNCP propostas abertas ─────────────────────────────────────────
 # Retorna tudo — sem filtro de palavra-chave (PNCP não suporta busca textual)
 
-def pncp_get(endpoint, params, tentativas=3):
-    """GET ao PNCP com retry automático e validação de JSON."""
+def pncp_get(endpoint, params):
+    """
+    GET ao PNCP com duas estratégias:
+    1. Tenta com proxy (se configurado)
+    2. Se proxy falhar ou retornar vazio, tenta sem proxy com headers de navegador
+    """
+    url = f"https://pncp.gov.br/api/consulta/v1/{endpoint}"
+
+    estrategias = []
+    if PROXY_URL:
+        estrategias.append({"proxies": proxies(),  "label": "com proxy"})
+    estrategias.append(    {"proxies": None,        "label": "sem proxy"})
+
     ultimo_erro = None
-    for t in range(tentativas):
-        try:
-            r = requests.get(
-                f"https://pncp.gov.br/api/consulta/v1/{endpoint}",
-                params=params,
-                headers=HEADERS,
-                proxies=proxies(),
-                timeout=TIMEOUT,
-            )
-            # Valida que a resposta é JSON antes de tentar parsear
-            ct = r.headers.get("Content-Type", "")
-            if "json" not in ct and not r.text.strip().startswith("{"):
-                raise ValueError(f"Resposta não é JSON (status {r.status_code}): {r.text[:100]}")
-            r.raise_for_status()
-            return r.json()
-        except (ValueError, requests.exceptions.JSONDecodeError) as e:
-            ultimo_erro = e
-            time.sleep(2 ** t)   # espera 1s, 2s, 4s entre tentativas
-            continue
-        except requests.exceptions.RequestException as e:
-            ultimo_erro = e
-            if t < tentativas - 1:
-                time.sleep(2 ** t)
-            continue
-    raise ultimo_erro
+    for estrategia in estrategias:
+        for tentativa in range(2):   # 2 tentativas por estratégia
+            try:
+                r = requests.get(
+                    url,
+                    params=params,
+                    headers=HEADERS,
+                    proxies=estrategia["proxies"],
+                    timeout=TIMEOUT,
+                )
+                # Resposta vazia = proxy falhou silenciosamente
+                if not r.text or not r.text.strip():
+                    raise ValueError(f"Resposta vazia [{estrategia['label']}]")
+
+                # Resposta não-JSON = página de erro HTML
+                if not r.text.strip().startswith("{"):
+                    raise ValueError(f"Não é JSON [{estrategia['label']}] status={r.status_code}: {r.text[:80]}")
+
+                r.raise_for_status()
+                return r.json()
+
+            except (ValueError, requests.exceptions.JSONDecodeError) as e:
+                ultimo_erro = e
+                if tentativa == 0:
+                    time.sleep(1)
+                continue
+            except requests.exceptions.Timeout:
+                ultimo_erro = Exception(f"Timeout [{estrategia['label']}]")
+                break   # timeout = passa para próxima estratégia imediatamente
+            except requests.exceptions.RequestException as e:
+                ultimo_erro = e
+                if tentativa == 0:
+                    time.sleep(1)
+                continue
+
+    raise ultimo_erro or Exception("Todas as estratégias falharam")
 
 
 def fonte_pncp_proposta(pagina, uf):
@@ -264,7 +302,7 @@ def testar_apis():
     res["_config"] = {
         "proxy_configurado": bool(PROXY_URL),
         "proxy_preview":     (PROXY_URL[:25] + "...") if PROXY_URL else "não configurado",
-        "versao":            "10.0",
+        "versao":            "11.0",
     }
     return jsonify(res)
 
@@ -273,6 +311,6 @@ def testar_apis():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n✅ Monitor v10 — http://localhost:{port}")
+    print(f"\n✅ Monitor v11 — http://localhost:{port}")
     print(f"   Proxy: {'✅ ativo' if PROXY_URL else '❌ não configurado'}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
