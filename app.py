@@ -1,11 +1,13 @@
 """
-Monitor de Licitações Gov — Backend v12
-Fontes estáveis que funcionam 100% no Railway sem proxy:
-  1. compras.dados.gov.br  — busca por descrição de texto nativa (SIASG)
-  2. api.portaldatransparencia.gov.br — busca livre, dados federais desde 2013
-  3. PNCP — mantido como bônus, falha silenciosamente se bloqueado
+Monitor de Licitações Gov — Backend v13
+Fontes estáveis confirmadas:
+  1. dadosabertos.compras.gov.br (API nova HTTPS) — materiais e contratações
+  2. api.portaldatransparencia.gov.br — licitações federais com busca textual
+  3. PNCP — bônus, falha silenciosamente se bloqueado pelo Cloudflare
 
-Nenhuma dessas fontes usa Cloudflare nem bloqueia IPs de nuvem.
+IMPORTANTE: Se TRANSPARENCIA_API_KEY estiver configurada, essa fonte
+retorna resultados reais com busca textual. Cadastro gratuito em:
+https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email
 """
 
 from flask import Flask, jsonify, request
@@ -19,99 +21,93 @@ app = Flask(__name__)
 CORS(app)
 
 TIMEOUT = 12
-HEADERS = {"Accept": "application/json", "User-Agent": "MonitorLicitacoesBr/12.0"}
-
+HEADERS = {"Accept": "application/json", "User-Agent": "MonitorLicitacoesBr/13.0"}
 TRANSPARENCIA_KEY = os.environ.get("TRANSPARENCIA_API_KEY", "")
 
-
-# ─── helpers ──────────────────────────────────────────────────────────────────
-
-def get(url, params=None, headers=None, allow_redirects=True):
-    r = requests.get(
-        url, params=params,
-        headers={**HEADERS, **(headers or {})},
-        timeout=TIMEOUT,
-        allow_redirects=allow_redirects,
-    )
-    r.raise_for_status()
-    return r.json()
 
 def fmt_data(s):
     if not s:
         return None
     s = str(s).strip()
-    # dd/mm/yyyy → yyyy-mm-dd
     if len(s) >= 10 and s[2] == "/":
         p = s[:10].split("/")
         return f"{p[2]}-{p[1]}-{p[0]}"
     return s[:10]
 
+def filtrar(texto, kw):
+    if not kw:
+        return True
+    t = (texto or "").lower()
+    return any(p in t for p in kw.lower().split() if len(p) > 2)
 
-# ─── Fonte 1: compras.dados.gov.br — busca por texto na descrição ─────────────
-# Suporta busca textual nativa via parâmetro "descricao"
-# HTTP obrigatório (não HTTPS), sem proxy, sem autenticação
 
-def fonte_compras_descricao(kw, pagina):
-    """Busca licitações por palavra-chave no objeto/descrição."""
+# ─── Fonte 1: dadosabertos.compras.gov.br (nova API HTTPS) ───────────────────
+
+def fonte_dadosabertos(kw, pagina):
+    """
+    Nova API do Compras.gov.br — HTTPS, sem autenticação.
+    Endpoint de materiais com busca por descrição.
+    """
     res, total = [], 0
 
-    # Busca por serviço com a palavra-chave
     try:
-        data = get(
-            "http://compras.dados.gov.br/servicos/v1/servicos.json",
-            params={"descricao": kw, "pagina": pagina},
-            allow_redirects=False,
+        r = requests.get(
+            "https://dadosabertos.compras.gov.br/modulo-material/1_consultarMaterial",
+            params={"pagina": pagina, "descricao": kw},
+            headers=HEADERS,
+            timeout=TIMEOUT,
         )
-        embedded = data.get("_embedded") or {}
-        items    = list(embedded.values())[0] if embedded else []
-        total   += (data.get("page") or {}).get("totalElements") or len(items)
-        for item in items:
-            res.append({
-                "id":         str(item.get("id") or ""),
-                "titulo":     item.get("descricao") or item.get("nome") or "Sem descrição",
-                "orgao":      item.get("orgao") or "Órgão não informado",
-                "uf":         "—",
-                "municipio":  "",
-                "modalidade": "Serviço cadastrado",
-                "valor":      None,
-                "dataEnc":    None,
-                "dataPub":    None,
-                "link":       None,
-                "fonte":      "Compras.gov",
-            })
+        if r.ok:
+            data  = r.json()
+            items = data.get("resultado") or []
+            total = data.get("totalRegistros") or len(items)
+            for item in items:
+                desc = item.get("descricaoMaterial") or item.get("descricao") or ""
+                if not filtrar(desc, kw):
+                    continue
+                res.append({
+                    "id":         str(item.get("codigoMaterial") or item.get("id") or ""),
+                    "titulo":     desc or "Sem descrição",
+                    "orgao":      "Catálogo de Materiais — Gov.br",
+                    "uf":         "—",
+                    "municipio":  "",
+                    "modalidade": "Material catalogado",
+                    "valor":      None,
+                    "dataEnc":    None,
+                    "dataPub":    None,
+                    "link":       "https://www.gov.br/compras/pt-br",
+                    "fonte":      "Compras.gov",
+                })
     except Exception:
         pass
 
-    # Busca por licitações com modalidade pregão
+    # Tenta endpoint de contratações
     try:
-        for modalidade in ["05", "01", "08"]:
-            data = get(
-                "http://compras.dados.gov.br/licitacoes/v1/licitacoes.json",
-                params={"modalidade": modalidade, "pagina": pagina},
-                allow_redirects=False,
-            )
-            embedded = data.get("_embedded") or {}
-            items    = list(embedded.values())[0] if embedded else []
-            total   += (data.get("page") or {}).get("totalElements") or len(items)
-
-            kw_lower = kw.lower()
-            palavras = [p for p in kw_lower.split() if len(p) > 2]
-
+        r = requests.get(
+            "https://dadosabertos.compras.gov.br/modulo-compra/2_consultarCompra",
+            params={"pagina": pagina, "descricao": kw},
+            headers=HEADERS,
+            timeout=TIMEOUT,
+        )
+        if r.ok:
+            data  = r.json()
+            items = data.get("resultado") or []
+            total = max(total, data.get("totalRegistros") or len(items))
             for item in items:
-                titulo = item.get("nome_objeto") or item.get("objeto") or ""
-                if palavras and not any(p in titulo.lower() for p in palavras):
+                titulo = item.get("objeto") or item.get("descricao") or ""
+                if not filtrar(titulo, kw):
                     continue
                 res.append({
-                    "id":         str(item.get("id") or ""),
+                    "id":         str(item.get("numeroCompra") or item.get("id") or ""),
                     "titulo":     titulo or "Sem descrição",
-                    "orgao":      item.get("nome_orgao") or "Órgão não informado",
+                    "orgao":      item.get("nomeUnidadeCompradora") or "Órgão não informado",
                     "uf":         (item.get("uf") or "—").upper(),
-                    "municipio":  item.get("municipio") or "",
-                    "modalidade": item.get("nome_modalidade") or "Pregão",
-                    "valor":      item.get("valor_estimado"),
-                    "dataEnc":    fmt_data(item.get("data_sessao")),
-                    "dataPub":    fmt_data(item.get("data_abertura")),
-                    "link":       None,
+                    "municipio":  "",
+                    "modalidade": item.get("modalidade") or "Não informada",
+                    "valor":      item.get("valorTotal") or item.get("valorEstimado"),
+                    "dataEnc":    fmt_data(item.get("dataEncerramentoProposta")),
+                    "dataPub":    fmt_data(item.get("dataPublicacao")),
+                    "link":       "https://www.gov.br/compras/pt-br",
                     "fonte":      "Compras.gov",
                 })
     except Exception:
@@ -120,14 +116,9 @@ def fonte_compras_descricao(kw, pagina):
     return res, total
 
 
-# ─── Fonte 2: Portal da Transparência — busca livre com chave de API ──────────
-# Cobre todos os órgãos federais desde 2013
-# Gratuito, estável, sem bloqueio de IP
+# ─── Fonte 2: Portal da Transparência (se chave configurada) ──────────────────
 
 def fonte_transparencia(kw, pagina):
-    if not TRANSPARENCIA_KEY:
-        raise Exception("TRANSPARENCIA_API_KEY não configurada")
-
     hoje = datetime.now()
     ini  = (hoje - timedelta(days=60)).strftime("%d/%m/%Y")
     fim  = hoje.strftime("%d/%m/%Y")
@@ -139,25 +130,28 @@ def fonte_transparencia(kw, pagina):
         "tamanhoPagina": 20,
     }
     if kw:
-        params["descricao"] = kw   # busca textual nativa
+        params["descricao"] = kw
 
-    data  = get(
+    r = requests.get(
         "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes",
         params=params,
-        headers={"chave-de-acesso": TRANSPARENCIA_KEY},
+        headers={**HEADERS, "chave-de-acesso": TRANSPARENCIA_KEY},
+        timeout=TIMEOUT,
     )
-
+    r.raise_for_status()
+    data  = r.json()
     items = data if isinstance(data, list) else (data.get("data") or [])
     total = len(items) if isinstance(data, list) else (data.get("totalRegistros") or len(items))
 
     res = []
     for item in items:
-        modalidade = (item.get("modalidade") or {})
-        orgao      = (item.get("orgaoSuperior") or item.get("unidadeGestora") or {})
+        modalidade = item.get("modalidade") or {}
+        orgao      = item.get("orgaoSuperior") or item.get("unidadeGestora") or {}
+        titulo     = item.get("objeto") or item.get("descricao") or ""
         res.append({
-            "id":         str(item.get("id") or item.get("numero") or ""),
-            "titulo":     item.get("objeto") or item.get("descricao") or "Sem descrição",
-            "orgao":      orgao.get("descricao") or "Órgão não informado",
+            "id":         str(item.get("id") or ""),
+            "titulo":     titulo or "Sem descrição",
+            "orgao":      orgao.get("descricao") if isinstance(orgao, dict) else str(orgao),
             "uf":         "—",
             "municipio":  "",
             "modalidade": modalidade.get("descricao") if isinstance(modalidade, dict) else str(modalidade),
@@ -167,11 +161,10 @@ def fonte_transparencia(kw, pagina):
             "link":       "https://portaldatransparencia.gov.br/licitacoes/consulta",
             "fonte":      "Transparência",
         })
-
     return res, total
 
 
-# ─── Fonte 3: PNCP — tenta sem proxy, falha silenciosamente ──────────────────
+# ─── Fonte 3: PNCP (bônus — pode ser bloqueado pelo Cloudflare) ──────────────
 
 def fonte_pncp(pagina, uf):
     hoje = datetime.now()
@@ -184,21 +177,17 @@ def fonte_pncp(pagina, uf):
     if uf:
         params["ufSigla"] = uf
 
-    headers = {
-        **HEADERS,
-        "Origin":  "https://pncp.gov.br",
-        "Referer": "https://pncp.gov.br/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
-    }
-
     r = requests.get(
         "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
-        params=params, headers=headers, timeout=TIMEOUT,
+        params=params,
+        headers={**HEADERS,
+                 "Origin":  "https://pncp.gov.br",
+                 "Referer": "https://pncp.gov.br/",
+                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0 Safari/537.36"},
+        timeout=10,
     )
-
     if not r.text or not r.text.strip().startswith("{"):
-        raise ValueError(f"PNCP bloqueou a requisição (status {r.status_code})")
-
+        raise ValueError(f"PNCP bloqueado (status {r.status_code})")
     r.raise_for_status()
     data  = r.json()
     items = data.get("data") or []
@@ -222,7 +211,6 @@ def fonte_pncp(pagina, uf):
             "link":       item.get("linkSistemaOrigem") or (f"https://pncp.gov.br/app/editais/{num}" if num else None),
             "fonte":      "PNCP",
         })
-
     return res, total
 
 
@@ -237,8 +225,8 @@ def buscar_licitacoes():
     resultados, erros, total, ids_vistos = [], [], 0, set()
 
     tarefas = {
-        "compras_dados": lambda: fonte_compras_descricao(kw, pagina),
-        "pncp":          lambda: fonte_pncp(pagina, uf),
+        "dadosabertos": lambda: fonte_dadosabertos(kw, pagina),
+        "pncp":         lambda: fonte_pncp(pagina, uf),
     }
     if TRANSPARENCIA_KEY:
         tarefas["transparencia"] = lambda: fonte_transparencia(kw, pagina)
@@ -275,10 +263,10 @@ def buscar_licitacoes():
 @app.route("/health")
 def health():
     return jsonify({
-        "status":    "ok",
-        "versao":    "12.0",
-        "timestamp": datetime.now().isoformat(),
+        "status":        "ok",
+        "versao":        "13.0",
         "transparencia": bool(TRANSPARENCIA_KEY),
+        "timestamp":     datetime.now().isoformat(),
     })
 
 
@@ -289,28 +277,27 @@ def testar_apis():
     hoje = datetime.now()
     res  = {}
 
-    # compras.dados.gov.br (sempre deve funcionar)
+    # dadosabertos.compras.gov.br
     try:
         t0 = datetime.now()
         r  = requests.get(
-            "http://compras.dados.gov.br/licitacoes/v1/licitacoes.json",
-            params={"modalidade": "05", "pagina": 1},
-            headers=HEADERS, timeout=TIMEOUT, allow_redirects=False,
+            "https://dadosabertos.compras.gov.br/modulo-compra/2_consultarCompra",
+            params={"pagina": 1, "descricao": "consultoria"},
+            headers=HEADERS, timeout=TIMEOUT,
         )
-        res["compras_dados"] = {
-            "ok": r.status_code == 200, "status": r.status_code,
+        res["dadosabertos"] = {
+            "ok": r.ok, "status": r.status_code,
             "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-            "nota": "fonte principal — HTTP direto",
+            "nota": "nova API HTTPS — fonte principal",
         }
     except Exception as e:
-        res["compras_dados"] = {"ok": False, "erro": str(e)[:120]}
+        res["dadosabertos"] = {"ok": False, "erro": str(e)[:120]}
 
     # Portal da Transparência
     if TRANSPARENCIA_KEY:
         try:
-            hoje_fmt = datetime.now()
-            ini = (hoje_fmt - timedelta(days=7)).strftime("%d/%m/%Y")
-            fim = hoje_fmt.strftime("%d/%m/%Y")
+            ini = (hoje - timedelta(days=7)).strftime("%d/%m/%Y")
+            fim = hoje.strftime("%d/%m/%Y")
             t0  = datetime.now()
             r   = requests.get(
                 "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes",
@@ -321,41 +308,39 @@ def testar_apis():
             res["transparencia"] = {
                 "ok": r.ok, "status": r.status_code,
                 "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-                "chave": "configurada",
+                "chave": "configurada ✅",
             }
         except Exception as e:
             res["transparencia"] = {"ok": False, "erro": str(e)[:120]}
     else:
         res["transparencia"] = {
-            "ok": False,
-            "nota": "opcional — cadastre em portaldatransparencia.gov.br/api-de-dados/cadastrar-email",
+            "ok":   False,
+            "nota": "⚠ chave não configurada — cadastre em portaldatransparencia.gov.br/api-de-dados/cadastrar-email",
         }
 
-    # PNCP (pode falhar — normal)
+    # PNCP
     try:
+        t0  = datetime.now()
         ini = hoje.strftime("%Y%m%d")
         fim = (hoje + timedelta(days=7)).strftime("%Y%m%d")
-        t0  = datetime.now()
         r   = requests.get(
             "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
             params={"dataInicial": ini, "dataFinal": fim, "pagina": 1, "tamanhoPagina": 1},
             headers=HEADERS, timeout=8,
         )
-        ok  = r.ok and r.text.strip().startswith("{")
+        ok = r.ok and r.text.strip().startswith("{")
         res["pncp"] = {
             "ok": ok, "status": r.status_code,
             "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
             "nota": "bônus — pode ser bloqueado pelo Cloudflare",
         }
     except Exception as e:
-        res["pncp"] = {
-            "ok": False, "erro": str(e)[:120],
-            "nota": "bônus — bloqueio esperado em Railway",
-        }
+        res["pncp"] = {"ok": False, "erro": str(e)[:80], "nota": "bloqueio esperado"}
 
     res["_config"] = {
-        "versao":          "12.0",
-        "transparencia":   bool(TRANSPARENCIA_KEY),
+        "versao":        "13.0",
+        "transparencia": bool(TRANSPARENCIA_KEY),
+        "dica":          "Configure TRANSPARENCIA_API_KEY para dados federais completos",
     }
     return jsonify(res)
 
@@ -364,6 +349,6 @@ def testar_apis():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n✅ Monitor v12 — http://localhost:{port}")
-    print(f"   Transparência: {'✅' if TRANSPARENCIA_KEY else '❌ não configurada (opcional)'}\n")
+    print(f"\n✅ Monitor v13 — http://localhost:{port}")
+    print(f"   Transparência: {'✅' if TRANSPARENCIA_KEY else '❌ não configurada'}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
