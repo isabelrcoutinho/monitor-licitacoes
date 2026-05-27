@@ -1,5 +1,5 @@
 """
-Monitor de Licitações Gov — Backend v15
+Monitor de Licitações Gov — Backend v16
 Fontes via dadosabertos.compras.gov.br (funciona no Railway):
   1. Módulo Legado — Pregão (dados históricos + recentes)
   2. Módulo Contratações PNCP 14133 — contratações pela nova lei
@@ -67,7 +67,7 @@ def fonte_contratacoes_pncp(kw, pagina, uf):
         params["ufSigla"] = uf
 
     data  = safe_get(
-        "https://dadosabertos.compras.gov.br/modulo-contratacao/1_consultarContratacao",
+        "https://dadosabertos.compras.gov.br/modulo-contratacoes/2_consultarContratacoes_PNCP_14133",
         params
     )
     items = data.get("resultado") or data.get("data") or []
@@ -102,35 +102,39 @@ def fonte_contratacoes_pncp(kw, pagina, uf):
 
 def fonte_pregao_legado(kw, pagina):
     hoje = datetime.now()
+    hoje = datetime.now()
     params = {
-        "pagina": pagina,
-        "tamanhoPagina": 20,
-        "dataAberturaInicio": (hoje - timedelta(days=20)).strftime("%Y-%m-%d"),
-        "dataAberturaFim":    (hoje + timedelta(days=30)).strftime("%Y-%m-%d"),
+        "pagina":          pagina,
+        "tamanhoPagina":   20,
+        "dt_abertura_ini": (hoje - timedelta(days=20)).strftime("%Y%m%d"),
+        "dt_abertura_fim": (hoje + timedelta(days=30)).strftime("%Y%m%d"),
     }
 
     data  = safe_get(
-        "https://dadosabertos.compras.gov.br/modulo-pregao/1_consultarPregao",
+        "https://dadosabertos.compras.gov.br/modulo-legado/3_consultarPregoes",
         params
     )
     items = data.get("resultado") or data.get("data") or []
+    if not items and isinstance(data, list):
+        items = data
     total = data.get("totalRegistros") or len(items)
 
     res = []
     for item in items:
-        titulo = item.get("objetoPregao") or item.get("objeto") or ""
+        titulo = (item.get("ds_objeto") or item.get("objetoPregao") or
+                  item.get("objeto") or "")
         if not filtrar(titulo, kw):
             continue
         res.append({
-            "id":         str(item.get("numeroAviso") or item.get("id") or id(item)),
+            "id":         str(item.get("nr_aviso") or item.get("numeroAviso") or item.get("id") or id(item)),
             "titulo":     titulo or "Sem descrição",
-            "orgao":      item.get("nomeOrgao") or item.get("orgao") or "Órgão não informado",
-            "uf":         (item.get("uf") or "—").upper(),
+            "orgao":      item.get("no_uasg") or item.get("nomeOrgao") or item.get("orgao") or "Órgão não informado",
+            "uf":         (item.get("sg_uf") or item.get("uf") or "—").upper(),
             "municipio":  item.get("municipio") or "",
             "modalidade": "Pregão Eletrônico",
-            "valor":      item.get("valorEstimado") or item.get("valor"),
-            "dataEnc":    fmt_data(item.get("dataAbertura") or item.get("dataEncerramentoProposta")),
-            "dataPub":    fmt_data(item.get("dataPublicacao")),
+            "valor":      item.get("vl_estimado") or item.get("valorEstimado") or item.get("valor"),
+            "dataEnc":    fmt_data(item.get("dt_abertura") or item.get("dataAbertura")),
+            "dataPub":    fmt_data(item.get("dt_publicacao") or item.get("dataPublicacao")),
             "link":       item.get("link") or "https://www.gov.br/compras/pt-br",
             "fonte":      "Compras.gov",
         })
@@ -280,7 +284,7 @@ def buscar_licitacoes():
 def health():
     return jsonify({
         "status":        "ok",
-        "versao":        "15.0",
+        "versao":        "16.0",
         "transparencia": bool(TRANSPARENCIA_KEY),
         "timestamp":     datetime.now().isoformat(),
     })
@@ -294,14 +298,14 @@ def testar_apis():
     res  = {}
 
     testes = {
-        "contratacoes_pncp14133": (
-            "https://dadosabertos.compras.gov.br/modulo-contratacao/1_consultarContratacao",
+        "contratacoes_pncp14133_v16": (
+            "https://dadosabertos.compras.gov.br/modulo-contratacoes/2_consultarContratacoes_PNCP_14133",
             {"pagina": 1, "tamanhoPagina": 1,
              "dataPublicacaoInicio": (hoje - timedelta(days=7)).strftime("%Y-%m-%d"),
              "dataPublicacaoFim": hoje.strftime("%Y-%m-%d")}
         ),
         "pregao_legado": (
-            "https://dadosabertos.compras.gov.br/modulo-pregao/1_consultarPregao",
+            "https://dadosabertos.compras.gov.br/modulo-legado/3_consultarPregoes",
             {"pagina": 1, "tamanhoPagina": 1,
              "dataAberturaInicio": (hoje - timedelta(days=7)).strftime("%Y-%m-%d"),
              "dataAberturaFim": (hoje + timedelta(days=7)).strftime("%Y-%m-%d")}
@@ -340,7 +344,7 @@ def testar_apis():
         res["transparencia"] = {"ok": False,
                                 "nota": "opcional — cadastre em portaldatransparencia.gov.br/api-de-dados/cadastrar-email"}
 
-    res["_config"] = {"versao": "15.0", "transparencia": bool(TRANSPARENCIA_KEY)}
+    res["_config"] = {"versao": "16.0", "transparencia": bool(TRANSPARENCIA_KEY)}
     return jsonify(res)
 
 
@@ -348,5 +352,5 @@ def testar_apis():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n✅ Monitor v15 — http://localhost:{port}")
+    print(f"\n✅ Monitor v16 — http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)
