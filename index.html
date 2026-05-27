@@ -23,8 +23,7 @@
 }
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:linear-gradient(rgba(61,127,255,0.015) 1px,transparent 1px),
-  linear-gradient(90deg,rgba(61,127,255,0.015) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(61,127,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(61,127,255,0.015) 1px,transparent 1px);
   background-size:48px 48px}
 .wrap{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:2rem 1.25rem 4rem}
 
@@ -56,14 +55,17 @@ h1 span{color:var(--accent2)}
 
 /* SEARCH */
 .search-area{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:1rem}
-.search-row{display:flex;gap:8px;margin-bottom:12px}
-.si{flex:1;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;padding:0 12px;outline:none;transition:border .2s}
+.search-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.si{flex:1;min-width:140px;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;padding:0 12px;outline:none;transition:border .2s}
 .si:focus{border-color:var(--accent)}.si::placeholder{color:var(--text3)}
 .si.short{max-width:90px;cursor:pointer}.si.mid{max-width:160px;cursor:pointer}
 .btn-buscar{height:38px;padding:0 20px;background:var(--accent);border:none;border-radius:var(--radius);color:#fff;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .2s;white-space:nowrap}
 .btn-buscar:hover{opacity:.85}.btn-buscar:disabled{opacity:.4;cursor:not-allowed}
+
+/* KEYWORD TAGS */
+.kw-section{display:flex;flex-direction:column;gap:8px}
 .kw-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.kw-hint{font-size:11px;color:var(--text3);font-family:var(--mono);margin-right:4px}
+.kw-hint{font-size:10px;color:var(--text3);font-family:var(--mono);min-width:60px;letter-spacing:.05em}
 .kw-tag{font-size:11px;padding:3px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;cursor:pointer;color:var(--text2);transition:all .15s;font-family:var(--mono)}
 .kw-tag:hover{border-color:var(--accent-border);color:var(--accent2)}
 .kw-tag.on{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent2)}
@@ -116,7 +118,7 @@ h1 span{color:var(--accent2)}
 .card-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;font-family:var(--mono)}
 .card-footer{display:flex;gap:6px;flex-wrap:wrap}
-.btn-c{font-size:11px;padding:5px 12px;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);transition:all .15s;display:flex;align-items:center;gap:5px}
+.btn-c{font-size:11px;padding:5px 12px;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font);transition:all .15s}
 .btn-c:hover{background:var(--bg3);color:var(--text)}
 .btn-c.acc{border-color:var(--accent-border);color:var(--accent2)}
 .btn-c.acc:hover{background:var(--accent-bg)}
@@ -181,54 +183,45 @@ footer a:hover{text-decoration:underline}
 
   <div class="search-area">
     <div class="search-row">
-      <input type="text" id="kw" class="si" placeholder="consultoria, treinamento, transformação digital..." value="consultoria">
+      <input type="text" id="kw" class="si" placeholder="Ex: consultoria, caneta, notebook..." value="consultoria">
       <select id="uf" class="si short">
         <option value="">UF</option>
         <option>DF</option><option>SP</option><option>RJ</option><option>MG</option>
         <option>RS</option><option>PR</option><option>SC</option><option>BA</option>
         <option>GO</option><option>PE</option><option>CE</option><option>AM</option>
       </select>
-      <select id="categoria" class="si mid" onchange="mudarCategoria(this.value)">
-        <option value="">Categoria</option>
-        <option value="servico">Serviços</option>
-        <option value="produto">Produtos</option>
-      </select>
-      <select id="modalidade" class="si mid">
-        <option value="">Modalidade</option>
-        <option value="pregao">Pregão eletrônico</option>
-        <option value="concorrencia">Concorrência</option>
-        <option value="dispensa">Dispensa</option>
-      </select>
       <button class="btn-buscar" id="btn" onclick="buscar()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Buscar
       </button>
     </div>
-    <div class="kw-row" id="kw-row">
-      <span class="kw-hint">serviços →</span>
-      <span class="kw-tag on" onclick="kw(this,'consultoria')">consultoria</span>
-      <span class="kw-tag" onclick="kw(this,'treinamento')">treinamento</span>
-      <span class="kw-tag" onclick="kw(this,'transformação digital')">transf. digital</span>
-      <span class="kw-tag" onclick="kw(this,'capacitação')">capacitação</span>
-      <span class="kw-tag" onclick="kw(this,'gestão')">gestão</span>
-      <span class="kw-tag" onclick="kw(this,'tecnologia')">tecnologia</span>
-      <span class="kw-tag" onclick="kw(this,'software')">software</span>
-      <span class="kw-tag" onclick="kw(this,'metodologia ágil')">método ágil</span>
-      <span class="kw-tag" onclick="kw(this,'assessoria')">assessoria</span>
-    </div>
-    <div class="kw-row" style="margin-top:8px">
-      <span class="kw-hint">produtos →</span>
-      <span class="kw-tag" onclick="kw(this,'material escritório')">mat. escritório</span>
-      <span class="kw-tag" onclick="kw(this,'caneta')">canetas</span>
-      <span class="kw-tag" onclick="kw(this,'papel resma')">papel/resma</span>
-      <span class="kw-tag" onclick="kw(this,'toner cartucho')">toner/cartucho</span>
-      <span class="kw-tag" onclick="kw(this,'mobiliário')">mobiliário</span>
-      <span class="kw-tag" onclick="kw(this,'notebook computador')">notebook</span>
-      <span class="kw-tag" onclick="kw(this,'cadeira mesa')">cadeira/mesa</span>
-      <span class="kw-tag" onclick="kw(this,'material limpeza')">limpeza</span>
-      <span class="kw-tag" onclick="kw(this,'coffee break')">coffee break</span>
-      <span class="kw-tag" onclick="kw(this,'água mineral')">água mineral</span>
-      <span class="kw-tag" onclick="kw(this,'uniforme')">uniforme</span>
+
+    <div class="kw-section">
+      <div class="kw-row">
+        <span class="kw-hint">serviços →</span>
+        <span class="kw-tag on" onclick="setKw(this,'consultoria')">consultoria</span>
+        <span class="kw-tag" onclick="setKw(this,'treinamento')">treinamento</span>
+        <span class="kw-tag" onclick="setKw(this,'transformação digital')">transf. digital</span>
+        <span class="kw-tag" onclick="setKw(this,'capacitação')">capacitação</span>
+        <span class="kw-tag" onclick="setKw(this,'gestão')">gestão</span>
+        <span class="kw-tag" onclick="setKw(this,'tecnologia')">tecnologia</span>
+        <span class="kw-tag" onclick="setKw(this,'software')">software</span>
+        <span class="kw-tag" onclick="setKw(this,'assessoria')">assessoria</span>
+      </div>
+      <div class="kw-row">
+        <span class="kw-hint">produtos →</span>
+        <span class="kw-tag" onclick="setKw(this,'material escritório')">mat. escritório</span>
+        <span class="kw-tag" onclick="setKw(this,'caneta')">caneta</span>
+        <span class="kw-tag" onclick="setKw(this,'papel resma')">papel/resma</span>
+        <span class="kw-tag" onclick="setKw(this,'toner cartucho')">toner/cartucho</span>
+        <span class="kw-tag" onclick="setKw(this,'notebook computador')">notebook</span>
+        <span class="kw-tag" onclick="setKw(this,'mobiliário')">mobiliário</span>
+        <span class="kw-tag" onclick="setKw(this,'cadeira mesa')">cadeira/mesa</span>
+        <span class="kw-tag" onclick="setKw(this,'material limpeza')">limpeza</span>
+        <span class="kw-tag" onclick="setKw(this,'água mineral')">água mineral</span>
+        <span class="kw-tag" onclick="setKw(this,'uniforme')">uniforme</span>
+        <span class="kw-tag" onclick="setKw(this,'coffee break')">coffee break</span>
+      </div>
     </div>
   </div>
 
@@ -239,7 +232,9 @@ footer a:hover{text-decoration:underline}
   <div class="tab-row">
     <div class="tab on" id="tab-abertas"  onclick="setTab('abertas')">✓ Em aberto</div>
     <div class="tab"    id="tab-recentes" onclick="setTab('recentes')">◷ Recentes</div>
-    <div class="tab"    id="tab-salvas"   onclick="setTab('salvas')">♡ Salvas <span id="sc" class="pill pill-blue" style="display:none">0</span></div>
+    <div class="tab"    id="tab-salvas"   onclick="setTab('salvas')">
+      ♡ Salvas <span id="sc" class="pill pill-blue" style="display:none">0</span>
+    </div>
   </div>
 
   <div class="res-head">
@@ -247,7 +242,7 @@ footer a:hover{text-decoration:underline}
       <span id="res-label">Resultados</span>
       <span class="pill pill-blue" id="cp" style="display:none">0</span>
     </div>
-    <div class="res-title" style="font-size:10px">fonte: PNCP + Compras.gov.br</div>
+    <div class="res-title" style="font-size:10px">fonte: Compras.gov.br + PNCP</div>
   </div>
 
   <div class="list" id="lista"></div>
@@ -256,7 +251,7 @@ footer a:hover{text-decoration:underline}
   </div>
 
   <footer>
-    <div>Monitor de Licitações Gov · v8</div>
+    <div>Monitor de Licitações Gov · v14</div>
     <div>
       <a href="https://pncp.gov.br" target="_blank">PNCP</a> ·
       <a href="https://compras.dados.gov.br" target="_blank">Compras.gov.br</a> ·
@@ -266,16 +261,25 @@ footer a:hover{text-decoration:underline}
 </div>
 
 <script>
-// ── Estado ──────────────────────────────────────────────────────────────────
-let resultados = [], salvas = [], pagina = 1, tabAtual = 'abertas', totalAPI = 0;
-let BACKEND = localStorage.getItem('backend_url') || 'https://web-production-dae63.up.railway.app';
+'use strict';
 
-// ── Modal ──────────────────────────────────────────────────────────────────
+// ── Config ───────────────────────────────────────────────────────────────────
+const BACKEND_DEFAULT = 'https://web-production-dae63.up.railway.app';
+let BACKEND   = localStorage.getItem('backend_url') || BACKEND_DEFAULT;
+let resultados = [];
+let salvas     = [];
+let pagina     = 1;
+let tabAtual   = 'abertas';
+let totalAPI   = 0;
+
+// ── Modal ────────────────────────────────────────────────────────────────────
 function abrirModal() {
   document.getElementById('backend-input').value = BACKEND;
   document.getElementById('modal-overlay').classList.add('show');
 }
-function fecharModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+function fecharModal() {
+  document.getElementById('modal-overlay').classList.remove('show');
+}
 function salvarBackend() {
   BACKEND = document.getElementById('backend-input').value.trim().replace(/\/$/, '');
   localStorage.setItem('backend_url', BACKEND);
@@ -283,19 +287,19 @@ function salvarBackend() {
   atualizarStatusTag();
   buscar();
 }
-document.getElementById('modal-overlay').addEventListener('click', e => {
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
   if (e.target === e.currentTarget) fecharModal();
 });
 
 function atualizarStatusTag() {
-  const tag = document.getElementById('status-tag');
-  const lbl = document.getElementById('backend-label');
+  var tag = document.getElementById('status-tag');
+  var lbl = document.getElementById('backend-label');
   if (BACKEND) {
     tag.textContent = '● API real conectada';
     tag.style.color = 'var(--green)';
     lbl.textContent = BACKEND.replace('https://','');
   } else {
-    tag.textContent = '○ Sem backend — modo demo';
+    tag.textContent = '○ Sem backend';
     tag.style.color = 'var(--amber)';
     lbl.textContent = 'clique em ⚙ Configurar';
   }
@@ -304,18 +308,18 @@ atualizarStatusTag();
 
 // ── Alertas ──────────────────────────────────────────────────────────────────
 function showAlert(tipo, msg, dur) {
-  ['warn','err','ok'].forEach(t => {
+  ['warn','err','ok'].forEach(function(t) {
     document.getElementById('alert-'+t).classList.remove('show');
   });
-  const el = document.getElementById('alert-'+tipo);
+  var el = document.getElementById('alert-'+tipo);
   el.innerHTML = msg;
   el.classList.add('show');
-  if (dur !== 0) setTimeout(() => el.classList.remove('show'), dur || 8000);
+  if (dur !== 0) setTimeout(function(){ el.classList.remove('show'); }, dur || 8000);
 }
 
-// ── Keywords ──────────────────────────────────────────────────────────────────
-function kw(el, v) {
-  document.querySelectorAll('.kw-tag').forEach(t => t.classList.remove('on'));
+// ── Keyword tags ──────────────────────────────────────────────────────────────
+function setKw(el, v) {
+  document.querySelectorAll('.kw-tag').forEach(function(t){ t.classList.remove('on'); });
   el.classList.add('on');
   document.getElementById('kw').value = v;
 }
@@ -323,15 +327,16 @@ function kw(el, v) {
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function setTab(t) {
   tabAtual = t;
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('on'); });
   document.getElementById('tab-'+t).classList.add('on');
-  t === 'salvas' ? renderSalvas() : render(resultados);
+  if (t === 'salvas') renderSalvas();
+  else render(resultados);
 }
 
 // ── Formatadores ──────────────────────────────────────────────────────────────
 function fmtV(v) {
   if (!v || isNaN(v)) return null;
-  const n = parseFloat(v);
+  var n = parseFloat(v);
   if (n >= 1e6) return 'R$ '+(n/1e6).toFixed(1).replace('.',',')+' M';
   if (n >= 1e3) return 'R$ '+Math.round(n/1e3)+'k';
   return 'R$ '+Math.round(n).toLocaleString('pt-BR');
@@ -339,313 +344,267 @@ function fmtV(v) {
 function fmtD(s) {
   if (!s) return null;
   try {
-    // aceita yyyy-mm-dd ou dd/mm/yyyy
-    let d;
-    if (s.includes('/')) {
-      const p = s.split('/');
-      d = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+    var d;
+    if (typeof s === 'string' && s.indexOf('/') === 2) {
+      var p = s.split('/');
+      d = new Date(p[2]+'-'+p[1]+'-'+p[0]);
     } else {
       d = new Date(s);
     }
-    return isNaN(d) ? s : d.toLocaleDateString('pt-BR');
-  } catch(e) { return s; }
+    return isNaN(d.getTime()) ? String(s) : d.toLocaleDateString('pt-BR');
+  } catch(e) { return String(s); }
 }
 function diasR(s) {
   if (!s) return null;
   try {
-    let d;
-    if (s.includes('/')) {
-      const p = s.split('/');
-      d = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+    var d;
+    if (typeof s === 'string' && s.indexOf('/') === 2) {
+      var p = s.split('/');
+      d = new Date(p[2]+'-'+p[1]+'-'+p[0]);
     } else {
       d = new Date(s);
     }
-    return Math.ceil((d - new Date()) / 86400000);
+    return isNaN(d.getTime()) ? null : Math.ceil((d - new Date()) / 86400000);
   } catch(e) { return null; }
 }
 
-// ── Categoria ────────────────────────────────────────────────────────────────
-const KW_SERVICOS = ['consultoria','treinamento','transformação digital','capacitação','gestão','tecnologia','software','metodologia ágil','assessoria'];
-const KW_PRODUTOS = ['material de escritório','caneta','papel','toner cartucho','mobiliário','equipamento informática','notebook computador','cadeira mesa','material limpeza','coffee break alimentação'];
-
-function mudarCategoria(cat) {
-  // Reseta todos os atalhos
-  document.querySelectorAll('.kw-tag').forEach(t => t.classList.remove('on'));
-  if (cat === 'servico') {
-    document.getElementById('kw').value = 'consultoria';
-    document.querySelector('[onclick="kw(this,'consultoria')"]').classList.add('on');
-  } else if (cat === 'produto') {
-    document.getElementById('kw').value = 'material de escritório';
-    document.querySelector('[onclick="kw(this,'material de escritório')"]').classList.add('on');
-  }
-}
-
-// ── Filtro local ──────────────────────────────────────────────────────────────
+// ── Filtro local por palavra-chave ────────────────────────────────────────────
 function filtrarItem(item, kw) {
   if (!kw || !kw.trim()) return true;
-  const palavras = kw.toLowerCase().split(/\s+/).filter(p => p.length > 2);
-  if (!palavras.length) return true;
-  const texto = [item.titulo, item.orgao, item.modalidade, item.municipio]
-    .join(' ').toLowerCase();
-  return palavras.some(p => texto.includes(p));
+  var palavras = kw.toLowerCase().split(/\s+/).filter(function(p){ return p.length > 2; });
+  if (palavras.length === 0) return true;
+  var texto = [
+    item.titulo   || '',
+    item.orgao    || '',
+    item.modalidade || '',
+    item.municipio  || ''
+  ].join(' ').toLowerCase();
+  return palavras.some(function(p){ return texto.indexOf(p) !== -1; });
+}
+
+// ── Normaliza item de qualquer fonte ─────────────────────────────────────────
+function normalizar(item) {
+  return {
+    id:         String(item.id || item.numeroControlePNCP || item.sequencialCompra || Math.random()),
+    titulo:     item.titulo     || item.objetoCompra   || item.objeto         || item.nome_objeto   || item.descricao || item.descricaoMaterial || 'Sem descrição',
+    orgao:      item.orgao      || (item.orgaoEntidade && item.orgaoEntidade.razaoSocial) || item.nome_orgao  || item.nomeUnidadeCompradora || 'Órgão não informado',
+    uf:         (item.uf        || (item.unidadeOrgao && item.unidadeOrgao.ufSigla) || '—').toUpperCase(),
+    municipio:  item.municipio  || (item.unidadeOrgao && item.unidadeOrgao.municipioNome) || '',
+    modalidade: item.modalidade || item.modalidadeNome || item.nome_modalidade || 'Não informada',
+    valor:      item.valor      || item.valorTotalEstimado || item.valor_estimado || item.valorLicitacao || item.valorTotal || null,
+    dataEnc:    item.dataEnc    || item.dataEncerramentoProposta || item.data_sessao  || item.dataFim || null,
+    dataPub:    item.dataPub    || item.dataPublicacaoPncp       || item.data_abertura || item.dataPublicacao || null,
+    link:       item.link       || item.linkSistemaOrigem
+                || (item.numeroControlePNCP ? 'https://pncp.gov.br/app/editais/'+item.numeroControlePNCP : null),
+    fonte:      item.fonte      || 'Gov',
+  };
 }
 
 // ── Buscar ────────────────────────────────────────────────────────────────────
-async function buscar(reset) {
+function buscar(reset) {
   if (reset !== false) { pagina = 1; resultados = []; }
-  const kwVal = document.getElementById('kw').value.trim() || 'consultoria';
-  const ufVal = document.getElementById('uf').value;
-  const btn   = document.getElementById('btn');
+
+  var kwVal = (document.getElementById('kw').value || '').trim();
+  var ufVal = document.getElementById('uf').value || '';
+  var btn   = document.getElementById('btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Buscando...';
 
-  if (pagina === 1)
+  if (pagina === 1) {
     document.getElementById('lista').innerHTML =
       '<div class="loading"><span class="spin"></span>&nbsp; Consultando APIs...</div>';
-
-  let novos = [], erros = [], total = 0;
-
-  if (BACKEND) {
-    try {
-      const qs = new URLSearchParams({ q: kwVal, pagina });
-      if (ufVal) qs.set('uf', ufVal);
-      const r = await fetch(`${BACKEND}/api/licitacoes?${qs}`);
-      if (!r.ok) throw new Error('HTTP '+r.status);
-      const d = await r.json();
-
-      // ── Normaliza o array de resultados ──────────────────────────────────
-      // Suporta tanto { resultados: [...] } quanto array direto
-      let arr = [];
-      if (Array.isArray(d)) {
-        arr = d;
-      } else if (Array.isArray(d.resultados)) {
-        arr = d.resultados;
-      } else if (Array.isArray(d.data)) {
-        arr = d.data;
-      }
-
-      total = d.total || d.totalRegistros || arr.length;
-      erros = d.erros || [];
-
-      // ── Normaliza cada item ───────────────────────────────────────────────
-      // Filtra por palavra-chave no frontend
-      novos = arr.map(normalizar).filter(item => filtrarItem(item, kwVal));
-
-      if (erros.length) {
-        showAlert('warn', '⚠ Algumas fontes com erro: '+erros.join(' | '));
-      }
-
-    } catch(e) {
-      showAlert('err', '✗ Erro ao conectar ao backend: '+e.message+
-        '. Verifique a URL em ⚙ Configurar.');
-      novos = demoData(kwVal).filter(item => filtrarItem(item, kwVal));
-      total = novos.length;
-    }
-  } else {
-    showAlert('warn', '⚠ Backend não configurado. Clique em ⚙ Configurar e cole a URL do Railway.',0);
-    novos = demoData(kwVal).filter(item => filtrarItem(item, kwVal));
-    total = novos.length;
   }
 
-  resultados = pagina === 1 ? novos : [...resultados, ...novos];
-  totalAPI   = total;
-  atualizarStats();
-  render(resultados);
+  var url = BACKEND + '/api/licitacoes?q=' + encodeURIComponent(kwVal) +
+            '&pagina=' + pagina +
+            (ufVal ? '&uf='+encodeURIComponent(ufVal) : '');
 
-  btn.disabled = false;
-  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Buscar';
-  document.getElementById('st-hora').textContent =
-    new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  document.getElementById('load-more').style.display =
-    novos.length >= 10 ? 'block' : 'none';
+  fetch(url)
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    })
+    .then(function(d) {
+      // Extrai array de qualquer formato de resposta
+      var arr = [];
+      if (Array.isArray(d))                arr = d;
+      else if (Array.isArray(d.resultados)) arr = d.resultados;
+      else if (Array.isArray(d.data))       arr = d.data;
+
+      totalAPI = d.total || d.totalRegistros || arr.length;
+
+      // Normaliza e filtra por palavra-chave
+      var novos = arr.map(normalizar).filter(function(item) {
+        return filtrarItem(item, kwVal);
+      });
+
+      // Mostra erros não críticos como aviso
+      if (d.erros && d.erros.length) {
+        var errosPncp = d.erros.filter(function(e){ return e.indexOf('pncp') !== -1; });
+        var errosOutros = d.erros.filter(function(e){ return e.indexOf('pncp') === -1; });
+        if (errosOutros.length) showAlert('warn', '⚠ ' + errosOutros.join(' | '));
+        // Erros do PNCP são silenciosos (esperado)
+      }
+
+      resultados = pagina === 1 ? novos : resultados.concat(novos);
+      atualizarStats();
+      render(resultados);
+
+      document.getElementById('st-hora').textContent =
+        new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('load-more').style.display =
+        novos.length >= 10 ? 'block' : 'none';
+    })
+    .catch(function(e) {
+      showAlert('err', '✗ Erro ao conectar: '+e.message+'. Verifique ⚙ Configurar.');
+      document.getElementById('lista').innerHTML =
+        '<div class="empty">✗<br><br>Não foi possível conectar ao backend.<br>Verifique a URL em ⚙ Configurar.</div>';
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Buscar';
+    });
 }
 
 function mais() { pagina++; buscar(false); }
 
-// ── Normaliza item de qualquer fonte/versão do backend ───────────────────────
-function normalizar(item) {
-  return {
-    id:         String(item.id || item.numeroControlePNCP || item.sequencialCompra || Math.random()),
-    titulo:     item.titulo || item.objetoCompra || item.objeto || item.nome_objeto || item.descricao || 'Sem descrição',
-    orgao:      item.orgao  || (item.orgaoEntidade||{}).razaoSocial || item.nome_orgao || 'Órgão não informado',
-    uf:         (item.uf    || (item.unidadeOrgao||{}).ufSigla || '—').toUpperCase(),
-    municipio:  item.municipio || (item.unidadeOrgao||{}).municipioNome || '',
-    modalidade: item.modalidade || item.modalidadeNome || item.nome_modalidade || 'Não informada',
-    valor:      item.valor  || item.valorTotalEstimado || item.valor_estimado || item.valorLicitacao || null,
-    dataEnc:    item.dataEnc || item.dataEncerramentoProposta || item.data_sessao || item.dataFim || null,
-    dataPub:    item.dataPub || item.dataPublicacaoPncp || item.data_abertura || item.dataPublicacao || null,
-    link:       item.link   || item.linkSistemaOrigem
-                || (item.numeroControlePNCP ? `https://pncp.gov.br/app/editais/${item.numeroControlePNCP}` : null),
-    fonte:      item.fonte  || 'Gov',
-  };
-}
-
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function atualizarStats() {
-  const urg = resultados.filter(r => {
-    const d = diasR(r.dataEnc); return d !== null && d >= 0 && d <= 3;
+  var urg = resultados.filter(function(r) {
+    var d = diasR(r.dataEnc);
+    return d !== null && d >= 0 && d <= 3;
   }).length;
-  const vt = resultados.reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
+  var vt = resultados.reduce(function(s,r){ return s + (parseFloat(r.valor)||0); }, 0);
   document.getElementById('st-total').textContent = (totalAPI||resultados.length).toLocaleString('pt-BR');
   document.getElementById('st-urg').textContent   = urg;
   document.getElementById('st-valor').textContent = vt > 0 ? fmtV(vt) : '—';
-  const cp = document.getElementById('cp');
-  cp.textContent = resultados.length; cp.style.display = 'inline';
+  var cp = document.getElementById('cp');
+  cp.textContent = resultados.length;
+  cp.style.display = 'inline';
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(items) {
-  const el = document.getElementById('lista');
-  document.getElementById('res-label').textContent =
-    tabAtual === 'salvas' ? 'Salvas' : tabAtual === 'recentes' ? 'Recentes' : 'Em aberto';
+  var el = document.getElementById('lista');
+  var labels = {abertas:'Em aberto', recentes:'Recentes', salvas:'Salvas'};
+  document.getElementById('res-label').textContent = labels[tabAtual] || 'Resultados';
   if (!items || !items.length) {
     el.innerHTML = '<div class="empty">◎<br><br>Nenhuma licitação encontrada.<br>Tente outros termos ou modalidades.</div>';
     return;
   }
-  el.innerHTML = items.map((item,i) => cardHTML(item,i)).join('');
+  el.innerHTML = items.map(function(item,i){ return cardHTML(item,i); }).join('');
 }
 
 function renderSalvas() {
-  const el = document.getElementById('lista');
+  var el = document.getElementById('lista');
   document.getElementById('res-label').textContent = 'Salvas';
   if (!salvas.length) {
     el.innerHTML = '<div class="empty">♡<br><br>Nenhuma licitação salva.<br>Clique em Salvar em qualquer card.</div>';
     return;
   }
-  el.innerHTML = salvas.map((item,i) => cardHTML(item,i)).join('');
+  el.innerHTML = salvas.map(function(item,i){ return cardHTML(item,i); }).join('');
 }
 
 function cardHTML(item, idx) {
-  const dias   = diasR(item.dataEnc);
-  const urg    = dias === null ? 'n' : dias <= 3 ? 'r' : dias <= 7 ? 'a' : 'g';
-  const dotCls = {g:'dot-g',a:'dot-a',r:'dot-r',n:'dot-g'}[urg];
-  const pCls   = {g:'pill-green',a:'pill-amber',r:'pill-red',n:'pill-gray'}[urg];
-  const urgLbl = dias === null ? '' : dias <= 0 ? 'Encerrado' : dias === 1 ? 'Encerra amanhã' : `${dias} dias restantes`;
-  const vf     = fmtV(item.valor);
-  const isSalva = salvas.some(s => s.id === item.id);
-  const delay   = Math.min(idx*40, 400);
-  const sid     = String(item.id).replace(/[^a-z0-9_-]/gi,'_');
-  const fc      = item.fonte === 'Demo' ? 'pill-gray' : 'pill-blue';
+  var dias    = diasR(item.dataEnc);
+  var urg     = dias === null ? 'n' : dias <= 3 ? 'r' : dias <= 7 ? 'a' : 'g';
+  var dotCls  = {g:'dot-g',a:'dot-a',r:'dot-r',n:'dot-g'}[urg];
+  var pCls    = {g:'pill-green',a:'pill-amber',r:'pill-red',n:'pill-gray'}[urg];
+  var urgLbl  = dias === null ? '' : dias <= 0 ? 'Encerrado' : dias === 1 ? 'Encerra amanhã' : dias+' dias restantes';
+  var vf      = fmtV(item.valor);
+  var isSalva = salvas.some(function(s){ return s.id === item.id; });
+  var delay   = Math.min(idx * 40, 400);
+  var fc      = item.fonte === 'Demo' ? 'pill-gray' : 'pill-blue';
+  var safeId  = item.id.replace(/[^a-z0-9]/gi,'_');
 
-  return `<div class="card" style="animation-delay:${delay}ms">
-    <div class="card-top">
-      <div style="display:flex;gap:8px;flex:1">
-        <div class="card-dot ${dotCls}"></div>
-        <div class="card-title">${item.titulo}</div>
-      </div>
-      ${vf ? `<div class="card-valor">${vf}</div>` : ''}
-    </div>
-    <div class="card-meta">
-      <span class="meta">🏛 ${item.orgao}</span>
-      <span class="meta">📍 ${item.uf}${item.municipio?' · '+item.municipio:''}</span>
-      <span class="meta">📄 ${item.modalidade}</span>
-      ${item.dataEnc ? `<span class="meta">📅 ${fmtD(item.dataEnc)}</span>` : ''}
-      ${urgLbl ? `<span class="pill ${pCls}">${urgLbl}</span>` : ''}
-      <span class="pill ${fc}">${item.fonte}</span>
-    </div>
-    <div class="card-footer">
-      ${item.link ? `<button class="btn-c acc" onclick="window.open('${item.link}','_blank')">↗ Ver edital</button>` : ''}
-      <button class="btn-c ${isSalva?'heart':''}" onclick="toggleSave('${item.id}')">
-        ${isSalva ? '♥ Salva' : '♡ Salvar'}
-      </button>
-      <button class="btn-c ia" onclick="analisarIA('${item.id}')">🤖 Analisar com IA</button>
-    </div>
-  </div>`;
+  return '<div class="card" style="animation-delay:'+delay+'ms">' +
+    '<div class="card-top">' +
+      '<div style="display:flex;gap:8px;flex:1">' +
+        '<div class="card-dot '+dotCls+'"></div>' +
+        '<div class="card-title">'+escHtml(item.titulo)+'</div>' +
+      '</div>' +
+      (vf ? '<div class="card-valor">'+vf+'</div>' : '') +
+    '</div>' +
+    '<div class="card-meta">' +
+      '<span class="meta">🏛 '+escHtml(item.orgao)+'</span>' +
+      '<span class="meta">📍 '+item.uf+(item.municipio?' · '+escHtml(item.municipio):'')+'</span>' +
+      '<span class="meta">📄 '+escHtml(item.modalidade)+'</span>' +
+      (item.dataEnc ? '<span class="meta">📅 '+fmtD(item.dataEnc)+'</span>' : '') +
+      (urgLbl ? '<span class="pill '+pCls+'">'+urgLbl+'</span>' : '') +
+      '<span class="pill '+fc+'">'+item.fonte+'</span>' +
+    '</div>' +
+    '<div class="card-footer">' +
+      (item.link ? '<button class="btn-c acc" onclick="window.open(\''+item.link+'\',\'_blank\')">↗ Ver edital</button>' : '') +
+      '<button class="btn-c '+(isSalva?'heart':'')+'" onclick="toggleSave(\''+safeId+'\',\''+item.id+'\')">' +
+        (isSalva ? '♥ Salva' : '♡ Salvar') +
+      '</button>' +
+      '<button class="btn-c ia" onclick="analisarIA(\''+item.id+'\')">🤖 Analisar com IA</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Salvar ────────────────────────────────────────────────────────────────────
-function toggleSave(id) {
-  const item = [...resultados,...salvas].find(r => r.id === id);
+function toggleSave(safeId, realId) {
+  var item = resultados.find(function(r){ return r.id === realId; });
+  if (!item) item = salvas.find(function(r){ return r.id === realId; });
   if (!item) return;
-  const idx = salvas.findIndex(s => s.id === id);
+  var idx = salvas.findIndex(function(s){ return s.id === realId; });
   if (idx >= 0) salvas.splice(idx,1); else salvas.push(item);
-  const sc = document.getElementById('sc');
-  sc.textContent = salvas.length; sc.style.display = salvas.length ? 'inline' : 'none';
-  tabAtual === 'salvas' ? renderSalvas() : render(resultados);
+  var sc = document.getElementById('sc');
+  sc.textContent = salvas.length;
+  sc.style.display = salvas.length ? 'inline' : 'none';
+  if (tabAtual === 'salvas') renderSalvas(); else render(resultados);
 }
 
-// ── Analisar ──────────────────────────────────────────────────────────────────
+// ── Analisar com IA ───────────────────────────────────────────────────────────
 function analisarIA(id) {
-  const item = [...resultados,...salvas].find(r => r.id === id);
+  var all  = resultados.concat(salvas);
+  var item = all.find(function(r){ return r.id === id; });
   if (!item) return;
-  const txt =
-`=== ANÁLISE DE OPORTUNIDADE — CONSULTECH ===
-
-📋 OBJETO: ${item.titulo}
-🏛  ÓRGÃO: ${item.orgao} (${item.uf})
-📄 MODALIDADE: ${item.modalidade}
-${item.valor ? '💰 VALOR ESTIMADO: '+fmtV(item.valor) : ''}
-${item.dataEnc ? '📅 ENCERRAMENTO: '+fmtD(item.dataEnc) : ''}
-${item.link ? '🔗 LINK: '+item.link : ''}
-
-ANÁLISE SOLICITADA:
-1. É compatível com consultoria em transformação digital / gestão ágil / produtividade?
-2. Como me posicionar para ganhar?
-3. Riscos e pontos de atenção.
-4. Próximos passos concretos.`;
-
+  var txt =
+    '=== ANÁLISE DE OPORTUNIDADE — CONSULTECH ===\n\n' +
+    '📋 OBJETO: '+item.titulo+'\n' +
+    '🏛  ÓRGÃO: '+item.orgao+' ('+item.uf+')\n' +
+    '📄 MODALIDADE: '+item.modalidade+'\n' +
+    (item.valor ? '💰 VALOR ESTIMADO: '+fmtV(item.valor)+'\n' : '') +
+    (item.dataEnc ? '📅 ENCERRAMENTO: '+fmtD(item.dataEnc)+'\n' : '') +
+    (item.link ? '🔗 LINK: '+item.link+'\n' : '') +
+    '\nANÁLISE SOLICITADA:\n' +
+    '1. É compatível com consultoria em transformação digital / gestão ágil / produtos de escritório?\n' +
+    '2. Como me posicionar para ganhar?\n' +
+    '3. Riscos e pontos de atenção.\n' +
+    '4. Próximos passos concretos.';
   navigator.clipboard.writeText(txt)
-    .then(() => showAlert('ok', '✓ Copiado! Cole no Claude ou ChatGPT para análise.'))
-    .catch(() => { prompt('Copie o texto:', txt); });
+    .then(function(){ showAlert('ok','✓ Copiado! Cole no Claude ou ChatGPT para análise.'); })
+    .catch(function(){ prompt('Copie o texto:',txt); });
 }
 
 // ── Relatório ─────────────────────────────────────────────────────────────────
 function gerarRelatorio() {
   if (!resultados.length) { showAlert('warn','⚠ Faça uma busca antes.'); return; }
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  let txt = `RELATÓRIO DE LICITAÇÕES — ${hoje}\n`;
-  txt += `Busca: "${document.getElementById('kw').value}" | Total: ${resultados.length}\n\n`;
+  var hoje = new Date().toLocaleDateString('pt-BR');
+  var txt  = 'RELATÓRIO DE LICITAÇÕES — '+hoje+'\n';
+  txt += 'Busca: "'+document.getElementById('kw').value+'" | Total: '+resultados.length+'\n\n';
   txt += '='.repeat(64)+'\n\n';
-  resultados.forEach((r,i) => {
-    const d = diasR(r.dataEnc);
-    txt += `${i+1}. ${r.titulo}\n`;
-    txt += `   Órgão: ${r.orgao} (${r.uf})\n`;
-    txt += `   Modalidade: ${r.modalidade}\n`;
-    if (r.valor) txt += `   Valor: ${fmtV(r.valor)}\n`;
-    if (r.dataEnc) txt += `   Encerra: ${fmtD(r.dataEnc)}${d!==null?' ('+(d<=0?'Encerrado':d+' dias')+')':''}\n`;
-    if (r.link)    txt += `   Link: ${r.link}\n`;
+  resultados.forEach(function(r,i){
+    var d = diasR(r.dataEnc);
+    txt += (i+1)+'. '+r.titulo+'\n';
+    txt += '   Órgão: '+r.orgao+' ('+r.uf+')\n';
+    txt += '   Modalidade: '+r.modalidade+'\n';
+    if (r.valor) txt += '   Valor: '+fmtV(r.valor)+'\n';
+    if (r.dataEnc) txt += '   Encerra: '+fmtD(r.dataEnc)+(d!==null?' ('+(d<=0?'Encerrado':d+' dias')+')':'')+'\n';
+    if (r.link)    txt += '   Link: '+r.link+'\n';
     txt += '\n';
   });
-  const a = document.createElement('a');
+  var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
-  a.download = `licitacoes-${new Date().toISOString().split('T')[0]}.txt`;
+  a.download = 'licitacoes-'+new Date().toISOString().split('T')[0]+'.txt';
   a.click();
   showAlert('ok','✓ Relatório gerado!');
-}
-
-// ── Demo ──────────────────────────────────────────────────────────────────────
-function demoData(kwArg) {
-  const kw = kwArg || 'consultoria';
-  const orgs = [
-    {nome:'Ministério da Gestão e Inovação',uf:'DF'},{nome:'INSS',uf:'DF'},
-    {nome:'Prefeitura de São Paulo',uf:'SP'},{nome:'Governo de MG',uf:'MG'},
-    {nome:'ANS',uf:'RJ'},{nome:'Banco do Brasil',uf:'DF'},
-    {nome:'TCU',uf:'DF'},{nome:'FNDE',uf:'DF'},
-    {nome:'Receita Federal',uf:'SP'},{nome:'DATAPREV',uf:'RJ'},
-  ];
-  const mods = [
-    {t:`Contratação de ${kw} em transformação digital`,v:480000,d:2,m:'Pregão Eletrônico'},
-    {t:`Serviços de ${kw} em gestão ágil`,v:320000,d:5,m:'Concorrência'},
-    {t:`${kw} e capacitação em gestão de processos`,v:195000,d:1,m:'Dispensa'},
-    {t:`Consultoria estratégica e mapeamento de fluxo`,v:750000,d:12,m:'Pregão Eletrônico'},
-    {t:`Programa de ${kw} em produtividade`,v:88000,d:3,m:'Pregão Eletrônico'},
-    {t:`Mentoria para implantação de PMO`,v:240000,d:20,m:'Concorrência'},
-    {t:`Plataforma SaaS de gestão e produtividade`,v:156000,d:7,m:'Pregão Eletrônico'},
-    {t:`Adoção de metodologias ágeis em TI`,v:420000,d:0,m:'Concorrência'},
-    {t:`Workshop de transformação digital – 3 dias`,v:65000,d:30,m:'Dispensa'},
-    {t:`Diagnóstico de maturidade digital`,v:285000,d:4,m:'Pregão Eletrônico'},
-  ];
-  const hoje = new Date();
-  return mods.map((m,i) => {
-    const enc = new Date(hoje); enc.setDate(enc.getDate()+m.d);
-    return {
-      id:'demo-'+i, titulo:m.t, orgao:orgs[i%orgs.length].nome,
-      uf:orgs[i%orgs.length].uf, municipio:'', modalidade:m.m,
-      valor:m.v, dataEnc:enc.toISOString().split('T')[0],
-      dataPub:new Date(hoje.getTime()-(i+1)*2*86400000).toISOString().split('T')[0],
-      link:'https://www.gov.br/compras/pt-br', fonte:'Demo'
-    };
-  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
