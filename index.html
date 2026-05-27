@@ -188,6 +188,11 @@ footer a:hover{text-decoration:underline}
         <option>RS</option><option>PR</option><option>SC</option><option>BA</option>
         <option>GO</option><option>PE</option><option>CE</option><option>AM</option>
       </select>
+      <select id="categoria" class="si mid" onchange="mudarCategoria(this.value)">
+        <option value="">Categoria</option>
+        <option value="servico">Serviços</option>
+        <option value="produto">Produtos</option>
+      </select>
       <select id="modalidade" class="si mid">
         <option value="">Modalidade</option>
         <option value="pregao">Pregão eletrônico</option>
@@ -199,17 +204,31 @@ footer a:hover{text-decoration:underline}
         Buscar
       </button>
     </div>
-    <div class="kw-row">
-      <span class="kw-hint">atalhos →</span>
-      <span class="kw-tag on"  onclick="kw(this,'consultoria')">consultoria</span>
-      <span class="kw-tag"     onclick="kw(this,'treinamento')">treinamento</span>
-      <span class="kw-tag"     onclick="kw(this,'transformação digital')">transf. digital</span>
-      <span class="kw-tag"     onclick="kw(this,'capacitação')">capacitação</span>
-      <span class="kw-tag"     onclick="kw(this,'gestão')">gestão</span>
-      <span class="kw-tag"     onclick="kw(this,'tecnologia')">tecnologia</span>
-      <span class="kw-tag"     onclick="kw(this,'software')">software</span>
-      <span class="kw-tag"     onclick="kw(this,'metodologia ágil')">método ágil</span>
-      <span class="kw-tag"     onclick="kw(this,'assessoria')">assessoria</span>
+    <div class="kw-row" id="kw-row">
+      <span class="kw-hint">serviços →</span>
+      <span class="kw-tag on" onclick="kw(this,'consultoria')">consultoria</span>
+      <span class="kw-tag" onclick="kw(this,'treinamento')">treinamento</span>
+      <span class="kw-tag" onclick="kw(this,'transformação digital')">transf. digital</span>
+      <span class="kw-tag" onclick="kw(this,'capacitação')">capacitação</span>
+      <span class="kw-tag" onclick="kw(this,'gestão')">gestão</span>
+      <span class="kw-tag" onclick="kw(this,'tecnologia')">tecnologia</span>
+      <span class="kw-tag" onclick="kw(this,'software')">software</span>
+      <span class="kw-tag" onclick="kw(this,'metodologia ágil')">método ágil</span>
+      <span class="kw-tag" onclick="kw(this,'assessoria')">assessoria</span>
+    </div>
+    <div class="kw-row" style="margin-top:8px">
+      <span class="kw-hint">produtos →</span>
+      <span class="kw-tag" onclick="kw(this,'material escritório')">mat. escritório</span>
+      <span class="kw-tag" onclick="kw(this,'caneta')">canetas</span>
+      <span class="kw-tag" onclick="kw(this,'papel resma')">papel/resma</span>
+      <span class="kw-tag" onclick="kw(this,'toner cartucho')">toner/cartucho</span>
+      <span class="kw-tag" onclick="kw(this,'mobiliário')">mobiliário</span>
+      <span class="kw-tag" onclick="kw(this,'notebook computador')">notebook</span>
+      <span class="kw-tag" onclick="kw(this,'cadeira mesa')">cadeira/mesa</span>
+      <span class="kw-tag" onclick="kw(this,'material limpeza')">limpeza</span>
+      <span class="kw-tag" onclick="kw(this,'coffee break')">coffee break</span>
+      <span class="kw-tag" onclick="kw(this,'água mineral')">água mineral</span>
+      <span class="kw-tag" onclick="kw(this,'uniforme')">uniforme</span>
     </div>
   </div>
 
@@ -345,6 +364,32 @@ function diasR(s) {
   } catch(e) { return null; }
 }
 
+// ── Categoria ────────────────────────────────────────────────────────────────
+const KW_SERVICOS = ['consultoria','treinamento','transformação digital','capacitação','gestão','tecnologia','software','metodologia ágil','assessoria'];
+const KW_PRODUTOS = ['material de escritório','caneta','papel','toner cartucho','mobiliário','equipamento informática','notebook computador','cadeira mesa','material limpeza','coffee break alimentação'];
+
+function mudarCategoria(cat) {
+  // Reseta todos os atalhos
+  document.querySelectorAll('.kw-tag').forEach(t => t.classList.remove('on'));
+  if (cat === 'servico') {
+    document.getElementById('kw').value = 'consultoria';
+    document.querySelector('[onclick="kw(this,'consultoria')"]').classList.add('on');
+  } else if (cat === 'produto') {
+    document.getElementById('kw').value = 'material de escritório';
+    document.querySelector('[onclick="kw(this,'material de escritório')"]').classList.add('on');
+  }
+}
+
+// ── Filtro local ──────────────────────────────────────────────────────────────
+function filtrarItem(item, kw) {
+  if (!kw || !kw.trim()) return true;
+  const palavras = kw.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+  if (!palavras.length) return true;
+  const texto = [item.titulo, item.orgao, item.modalidade, item.municipio]
+    .join(' ').toLowerCase();
+  return palavras.some(p => texto.includes(p));
+}
+
 // ── Buscar ────────────────────────────────────────────────────────────────────
 async function buscar(reset) {
   if (reset !== false) { pagina = 1; resultados = []; }
@@ -383,7 +428,8 @@ async function buscar(reset) {
       erros = d.erros || [];
 
       // ── Normaliza cada item ───────────────────────────────────────────────
-      novos = arr.map(normalizar);
+      // Filtra por palavra-chave no frontend
+      novos = arr.map(normalizar).filter(item => filtrarItem(item, kwVal));
 
       if (erros.length) {
         showAlert('warn', '⚠ Algumas fontes com erro: '+erros.join(' | '));
@@ -392,12 +438,12 @@ async function buscar(reset) {
     } catch(e) {
       showAlert('err', '✗ Erro ao conectar ao backend: '+e.message+
         '. Verifique a URL em ⚙ Configurar.');
-      novos = demoData(kwVal);
+      novos = demoData(kwVal).filter(item => filtrarItem(item, kwVal));
       total = novos.length;
     }
   } else {
     showAlert('warn', '⚠ Backend não configurado. Clique em ⚙ Configurar e cole a URL do Railway.',0);
-    novos = demoData(kwVal);
+    novos = demoData(kwVal).filter(item => filtrarItem(item, kwVal));
     total = novos.length;
   }
 
