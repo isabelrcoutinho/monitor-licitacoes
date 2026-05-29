@@ -1,14 +1,7 @@
 """
-Monitor de Licitações Gov — Backend v18
-
-FONTE PRINCIPAL: Portal da Transparência (licitações federais abertas)
-Requer TRANSPARENCIA_API_KEY — cadastro GRATUITO em:
-https://portaldatransparencia.gov.br/api-de-dados/cadastrar-email
-
-SEM CHAVE: retorna dados de referência de preços praticados (útil para 
-benchmarking) e tenta PNCP se não estiver bloqueado.
-
-Configure a variável no Railway → Variables → TRANSPARENCIA_API_KEY
+Monitor de Licitações Gov — Backend v19
+Correção definitiva do 401: testa os dois formatos de autenticação
+do Portal da Transparência (chave-de-acesso e Authorization Bearer).
 """
 
 from flask import Flask, jsonify, request
@@ -22,11 +15,11 @@ app = Flask(__name__)
 CORS(app)
 
 TIMEOUT = 12
-HEADERS = {
+HEADERS_BASE = {
     "Accept": "application/json",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0 Safari/537.36",
 }
-TRANSPARENCIA_KEY = os.environ.get("TRANSPARENCIA_API_KEY", "")
+TRANSPARENCIA_KEY = os.environ.get("TRANSPARENCIA_API_KEY", "").strip()
 
 
 def fmt_data(s):
@@ -39,24 +32,60 @@ def fmt_data(s):
     return s[:10]
 
 
-def filtrar(texto, kw):
-    if not kw or not kw.strip():
-        return True
-    t = (texto or "").lower()
-    palavras = [p for p in kw.lower().split() if len(p) > 2]
-    return not palavras or any(p in t for p in palavras)
+def get_auth_headers():
+    """
+    Tenta descobrir qual formato de autenticação funciona.
+    Retorna os headers corretos.
+    """
+    if not TRANSPARENCIA_KEY:
+        raise ValueError("TRANSPARENCIA_API_KEY não configurada")
+
+    # Testa os dois formatos possíveis
+    formatos = [
+        {"chave-de-acesso": TRANSPARENCIA_KEY},
+        {"Authorization": f"Bearer {TRANSPARENCIA_KEY}"},
+        {"Authorization": TRANSPARENCIA_KEY},
+    ]
+
+    url_teste = (
+        "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes"
+        "?dataInicial=01/05/2026&dataFinal=28/05/2026&pagina=1&tamanhoPagina=1"
+    )
+
+    for extra in formatos:
+        try:
+            r = requests.get(
+                url_teste,
+                headers={**HEADERS_BASE, **extra},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                return extra   # encontrou o formato correto
+        except Exception:
+            continue
+
+    # Nenhum formato funcionou — retorna o padrão e deixa o erro aparecer
+    return {"chave-de-acesso": TRANSPARENCIA_KEY}
 
 
-def safe_get(url, params=None, extra_headers=None):
-    h = {**HEADERS, **(extra_headers or {})}
-    r = requests.get(url, params=params, headers=h, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+# Cache do formato de auth para não testar toda vez
+_auth_headers_cache = None
+_auth_headers_ts    = None
 
 
-# ─── Fonte 1: Portal da Transparência ────────────────────────────────────────
-# Licitações ABERTAS federais com busca textual por descrição.
-# Requer chave gratuita: portaldatransparencia.gov.br/api-de-dados/cadastrar-email
+def auth_headers():
+    global _auth_headers_cache, _auth_headers_ts
+    now = datetime.now()
+    # Revalida a cada 30 minutos
+    if _auth_headers_cache is None or (
+        _auth_headers_ts and (now - _auth_headers_ts).seconds > 1800
+    ):
+        _auth_headers_cache = get_auth_headers()
+        _auth_headers_ts    = now
+    return _auth_headers_cache
+
+
+# ─── Fonte: Portal da Transparência ──────────────────────────────────────────
 
 def fonte_transparencia(kw, pagina):
     hoje = datetime.now()
@@ -69,13 +98,20 @@ def fonte_transparencia(kw, pagina):
     if kw:
         params["descricao"] = kw
 
-    data = safe_get(
+    r = requests.get(
         "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes",
         params=params,
-        extra_headers={"chave-de-acesso": TRANSPARENCIA_KEY},
+        headers={**HEADERS_BASE, **auth_headers()},
+        timeout=TIMEOUT,
     )
+    r.raise_for_status()
+
+    data  = r.json()
     items = data if isinstance(data, list) else (data.get("data") or [])
-    total = len(items) if isinstance(data, list) else (data.get("totalRegistros") or len(items))
+    total = (
+        len(items) if isinstance(data, list)
+        else (data.get("totalRegistros") or len(items))
+    )
 
     res = []
     for item in items:
@@ -85,20 +121,28 @@ def fonte_transparencia(kw, pagina):
         res.append({
             "id":         str(item.get("id") or ""),
             "titulo":     titulo or "Sem descrição",
-            "orgao":      (org.get("descricao") if isinstance(org, dict) else str(org)) or "Órgão não informado",
+            "orgao":      (
+                org.get("descricao") if isinstance(org, dict) else str(org)
+            ) or "Órgão não informado",
             "uf":         "Federal",
             "municipio":  "",
-            "modalidade": (mod.get("descricao") if isinstance(mod, dict) else str(mod)) or "Não informada",
+            "modalidade": (
+                mod.get("descricao") if isinstance(mod, dict) else str(mod)
+            ) or "Não informada",
             "valor":      item.get("valorLicitacao") or item.get("valor"),
-            "dataEnc":    fmt_data(item.get("dataResultadoCompra") or item.get("dataFim")),
-            "dataPub":    fmt_data(item.get("dataPublicacao") or item.get("dataAbertura")),
+            "dataEnc":    fmt_data(
+                item.get("dataResultadoCompra") or item.get("dataFim")
+            ),
+            "dataPub":    fmt_data(
+                item.get("dataPublicacao") or item.get("dataAbertura")
+            ),
             "link":       "https://portaldatransparencia.gov.br/licitacoes/consulta",
             "fonte":      "Transparência",
         })
     return res, total
 
 
-# ─── Fonte 2: PNCP (bônus — pode ser bloqueado pelo Cloudflare) ──────────────
+# ─── Fonte bônus: PNCP ───────────────────────────────────────────────────────
 
 def fonte_pncp(pagina, uf):
     hoje = datetime.now()
@@ -113,11 +157,14 @@ def fonte_pncp(pagina, uf):
 
     r = requests.get(
         "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
-        params=params, headers=HEADERS, timeout=10,
+        params=params,
+        headers=HEADERS_BASE,
+        timeout=10,
     )
     if not r.text or not r.text.strip().startswith("{"):
         raise ValueError(f"PNCP bloqueado (status {r.status_code})")
     r.raise_for_status()
+
     data  = r.json()
     items = data.get("data") or []
     total = data.get("totalRegistros") or len(items)
@@ -137,8 +184,9 @@ def fonte_pncp(pagina, uf):
             "valor":      item.get("valorTotalEstimado"),
             "dataEnc":    fmt_data(item.get("dataEncerramentoProposta")),
             "dataPub":    fmt_data(item.get("dataPublicacaoPncp")),
-            "link":       item.get("linkSistemaOrigem") or
-                          (f"https://pncp.gov.br/app/editais/{num}" if num else None),
+            "link":       item.get("linkSistemaOrigem") or (
+                f"https://pncp.gov.br/app/editais/{num}" if num else None
+            ),
             "fonte":      "PNCP",
         })
     return res, total
@@ -154,16 +202,20 @@ def buscar_licitacoes():
 
     resultados, erros, total, ids_vistos = [], [], 0, set()
 
-    # Sem chave: avisa e tenta só PNCP
     if not TRANSPARENCIA_KEY:
-        erros.append(
-            "CHAVE_AUSENTE: Configure TRANSPARENCIA_API_KEY no Railway para ver licitações abertas. "
-            "Cadastro grátis: portaldatransparencia.gov.br/api-de-dados/cadastrar-email"
-        )
+        return jsonify({
+            "resultados": [],
+            "total": 0,
+            "pagina": pagina,
+            "erros": ["CHAVE_AUSENTE: Configure TRANSPARENCIA_API_KEY no Railway"],
+            "chave_configurada": False,
+            "timestamp": datetime.now().isoformat(),
+        })
 
-    tarefas = {"pncp": lambda: fonte_pncp(pagina, uf)}
-    if TRANSPARENCIA_KEY:
-        tarefas["transparencia"] = lambda: fonte_transparencia(kw, pagina)
+    tarefas = {
+        "transparencia": lambda: fonte_transparencia(kw, pagina),
+        "pncp":          lambda: fonte_pncp(pagina, uf),
+    }
 
     with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {ex.submit(fn): nome for nome, fn in tarefas.items()}
@@ -180,17 +232,17 @@ def buscar_licitacoes():
                     total = tot
             except Exception as e:
                 if nome != "pncp":
-                    erros.append(f"{nome}: {type(e).__name__}: {str(e)[:100]}")
+                    erros.append(f"{nome}: {type(e).__name__}: {str(e)[:120]}")
 
     resultados.sort(key=lambda r: r.get("dataEnc") or "9999-12-31")
 
     return jsonify({
-        "resultados":         resultados,
-        "total":              total or len(resultados),
-        "pagina":             pagina,
-        "erros":              erros,
-        "chave_configurada":  bool(TRANSPARENCIA_KEY),
-        "timestamp":          datetime.now().isoformat(),
+        "resultados":        resultados,
+        "total":             total or len(resultados),
+        "pagina":            pagina,
+        "erros":             erros,
+        "chave_configurada": True,
+        "timestamp":         datetime.now().isoformat(),
     })
 
 
@@ -199,55 +251,77 @@ def buscar_licitacoes():
 @app.route("/health")
 def health():
     return jsonify({
-        "status":             "ok",
-        "versao":             "18.0",
-        "chave_configurada":  bool(TRANSPARENCIA_KEY),
-        "instrucao":          "" if TRANSPARENCIA_KEY else
-            "Configure TRANSPARENCIA_API_KEY. Cadastro grátis: "
-            "portaldatransparencia.gov.br/api-de-dados/cadastrar-email",
-        "timestamp":          datetime.now().isoformat(),
+        "status":            "ok",
+        "versao":            "19.0",
+        "chave_configurada": bool(TRANSPARENCIA_KEY),
+        "timestamp":         datetime.now().isoformat(),
     })
 
 
-# ─── Diagnóstico ──────────────────────────────────────────────────────────────
+# ─── Diagnóstico detalhado ────────────────────────────────────────────────────
 
 @app.route("/api/teste")
 def testar_apis():
     hoje = datetime.now()
     res  = {}
 
-    # Portal da Transparência
-    if TRANSPARENCIA_KEY:
-        try:
-            ini = (hoje - timedelta(days=7)).strftime("%d/%m/%Y")
-            fim = hoje.strftime("%d/%m/%Y")
-            t0  = datetime.now()
-            r   = requests.get(
-                "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes",
-                params={"dataInicial": ini, "dataFinal": fim,
-                        "pagina": 1, "tamanhoPagina": 3},
-                headers={**HEADERS, "chave-de-acesso": TRANSPARENCIA_KEY},
-                timeout=TIMEOUT,
-            )
-            body = ""
-            if r.ok:
-                d = r.json()
-                items = d if isinstance(d, list) else d.get("data", [])
-                body = f"{len(items)} registros retornados"
-            res["transparencia"] = {
-                "ok": r.ok, "status": r.status_code,
-                "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-                "chave": "✅ configurada",
-                "resultado": body,
-            }
-        except Exception as e:
-            res["transparencia"] = {"ok": False, "erro": str(e)[:120]}
-    else:
+    if not TRANSPARENCIA_KEY:
         res["transparencia"] = {
-            "ok":  False,
-            "nota": "⚠ CHAVE AUSENTE — cadastre em portaldatransparencia.gov.br/api-de-dados/cadastrar-email",
-            "instrucao": "Adicione TRANSPARENCIA_API_KEY nas variáveis do Railway",
+            "ok":   False,
+            "nota": "TRANSPARENCIA_API_KEY não configurada no Railway",
         }
+    else:
+        ini = (hoje - timedelta(days=7)).strftime("%d/%m/%Y")
+        fim = hoje.strftime("%d/%m/%Y")
+        url = "https://api.portaldatransparencia.gov.br/api-de-dados/licitacoes"
+        params = {"dataInicial": ini, "dataFinal": fim,
+                  "pagina": 1, "tamanhoPagina": 1}
+
+        # Testa cada formato de autenticação e mostra o resultado
+        formatos = {
+            "chave-de-acesso":   {"chave-de-acesso": TRANSPARENCIA_KEY},
+            "Bearer":            {"Authorization": f"Bearer {TRANSPARENCIA_KEY}"},
+            "Authorization-raw": {"Authorization": TRANSPARENCIA_KEY},
+        }
+
+        melhor = None
+        for nome_fmt, extra in formatos.items():
+            t0 = datetime.now()
+            try:
+                r = requests.get(
+                    url, params=params,
+                    headers={**HEADERS_BASE, **extra},
+                    timeout=8,
+                )
+                tempo = f"{(datetime.now()-t0).total_seconds():.1f}s"
+                info = {
+                    "status": r.status_code,
+                    "ok":     r.ok,
+                    "tempo":  tempo,
+                }
+                if r.ok:
+                    d = r.json()
+                    items = d if isinstance(d, list) else d.get("data", [])
+                    info["registros"] = len(items)
+                    info["formato_correto"] = True
+                    melhor = extra
+                else:
+                    info["body"] = r.text[:100]
+                res[f"auth_{nome_fmt}"] = info
+            except Exception as e:
+                res[f"auth_{nome_fmt}"] = {
+                    "ok": False, "erro": str(e)[:80],
+                    "tempo": f"{(datetime.now()-hoje).total_seconds():.1f}s",
+                }
+
+        if melhor:
+            # Atualiza o cache com o formato correto
+            global _auth_headers_cache, _auth_headers_ts
+            _auth_headers_cache = melhor
+            _auth_headers_ts    = datetime.now()
+            res["resultado"] = "✅ Formato correto encontrado e salvo no cache"
+        else:
+            res["resultado"] = "❌ Nenhum formato funcionou — verifique a chave no Railway"
 
     # PNCP
     try:
@@ -258,24 +332,21 @@ def testar_apis():
             "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta",
             params={"dataInicial": ini, "dataFinal": fim,
                     "pagina": 1, "tamanhoPagina": 1},
-            headers=HEADERS, timeout=8,
+            headers=HEADERS_BASE, timeout=8,
         )
         ok = r.ok and r.text.strip().startswith("{")
         res["pncp"] = {
             "ok": ok, "status": r.status_code,
             "tempo": f"{(datetime.now()-t0).total_seconds():.1f}s",
-            "nota": "bônus — pode ser bloqueado pelo Cloudflare do Railway",
+            "nota": "bônus — pode ser bloqueado pelo Cloudflare",
         }
     except Exception as e:
-        res["pncp"] = {
-            "ok": False, "erro": str(e)[:80],
-            "nota": "bloqueio pelo Cloudflare — normal no Railway",
-        }
+        res["pncp"] = {"ok": False, "erro": str(e)[:80]}
 
     res["_config"] = {
-        "versao":             "18.0",
-        "chave_configurada":  bool(TRANSPARENCIA_KEY),
-        "proximos_passos":    "Configure TRANSPARENCIA_API_KEY" if not TRANSPARENCIA_KEY else "Tudo OK!",
+        "versao":            "19.0",
+        "chave_configurada": bool(TRANSPARENCIA_KEY),
+        "chave_len":         len(TRANSPARENCIA_KEY) if TRANSPARENCIA_KEY else 0,
     }
     return jsonify(res)
 
@@ -284,9 +355,6 @@ def testar_apis():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"\n{'✅' if TRANSPARENCIA_KEY else '⚠'} Monitor v18 — http://localhost:{port}")
-    if not TRANSPARENCIA_KEY:
-        print("  ⚠ TRANSPARENCIA_API_KEY não configurada!")
-        print("  → Cadastre em: portaldatransparencia.gov.br/api-de-dados/cadastrar-email")
-        print("  → Adicione como variável de ambiente no Railway\n")
+    print(f"\n✅ Monitor v19 — http://localhost:{port}")
+    print(f"   Chave: {'✅ configurada' if TRANSPARENCIA_KEY else '❌ ausente'}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
